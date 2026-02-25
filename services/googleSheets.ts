@@ -197,20 +197,7 @@ export async function buildLeaderboardFromFullLog(collectors: { name: string; ri
   const SF_NAMES = new Set(["tony a", "veronika t", "travis b"]);
 
   try {
-    const [fullLog, collectorStatsEntries] = await Promise.all([
-      fetchFullLog(),
-      Promise.all(
-        collectors.map(async (collector) => {
-          try {
-            const stats = await fetchCollectorStats(collector.name);
-            return { collector, stats };
-          } catch {
-            return null;
-          }
-        })
-      ),
-    ]);
-
+    const fullLog = await fetchFullLog();
     const collectorMap = new Map<string, { name: string; rigs: string[] }>();
     collectors.forEach((collector) => {
       collectorMap.set(normalizeCollectorName(collector.name).toLowerCase(), collector);
@@ -247,37 +234,6 @@ export async function buildLeaderboardFromFullLog(collectors: { name: string; ri
       if (entry.status === "Completed") {
         existing.tasksCompleted += 1;
       }
-    });
-
-    collectorStatsEntries.forEach((item) => {
-      if (!item) return;
-      const normalizedName = normalizeCollectorName(item.collector.name);
-      const key = normalizedName.toLowerCase();
-      const hasSFRig = item.collector.rigs.some((rig) => rig.toUpperCase().includes("SF"));
-      const isSFByName = SF_NAMES.has(key.replace(/\.$/, "").trim());
-      const region = hasSFRig || isSFByName ? "SF" : "MX";
-      const statsHours = item.stats.weeklyLoggedHours > 0 ? item.stats.weeklyLoggedHours : item.stats.totalLoggedHours;
-      const statsAssigned = item.stats.weeklyCompleted > 0 ? Math.max(item.stats.weeklyCompleted, 1) : Math.max(item.stats.totalAssigned, 1);
-      const statsCompleted = item.stats.weeklyCompleted > 0 ? item.stats.weeklyCompleted : item.stats.totalCompleted;
-
-      const existing = aggregateMap.get(key);
-      if (!existing) {
-        aggregateMap.set(key, {
-          rank: 0,
-          collectorName: normalizedName,
-          hoursLogged: Math.max(0, statsHours),
-          tasksCompleted: Math.max(0, statsCompleted),
-          tasksAssigned: Math.max(1, statsAssigned),
-          completionRate: 0,
-          region,
-        });
-        return;
-      }
-
-      existing.hoursLogged = Math.max(existing.hoursLogged, Math.max(0, statsHours));
-      existing.tasksCompleted = Math.max(existing.tasksCompleted, Math.max(0, statsCompleted));
-      existing.tasksAssigned = Math.max(existing.tasksAssigned, Math.max(1, statsAssigned));
-      existing.region = region;
     });
 
     const results = Array.from(aggregateMap.values()).map((entry) => {

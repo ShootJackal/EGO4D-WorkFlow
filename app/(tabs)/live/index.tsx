@@ -164,7 +164,7 @@ function NewsTicker({ segments }: { segments: TickerSegment[] }) {
   const tickerText = seg.items.join("   |   ");
 
   const fadeOpacity = scrollX.interpolate({
-    inputRange: [SCREEN_WIDTH * 0.82, SCREEN_WIDTH * 1.25],
+    inputRange: [SCREEN_WIDTH * 0.7, SCREEN_WIDTH * 1.2],
     outputRange: [1, 0],
     extrapolate: 'clamp',
   });
@@ -186,7 +186,7 @@ function NewsTicker({ segments }: { segments: TickerSegment[] }) {
       </Animated.View>
       <View style={[tickerStyles.separator, { backgroundColor: isDark ? '#2E2E34' : '#E0DCD0' }]} />
       <View style={tickerStyles.scrollWrap}>
-        <View style={[tickerStyles.scrollHighlight, { backgroundColor: seg.color + (isDark ? '07' : '05') }]} />
+        <View style={[tickerStyles.scrollHighlight, { backgroundColor: seg.color + (isDark ? '0A' : '08') }]} />
         <Animated.Text
           style={[tickerStyles.scrollText, {
             color: seg.color,
@@ -704,11 +704,11 @@ const tickerStyles = StyleSheet.create({
   pillDot: { width: 5, height: 5, borderRadius: 3 },
   pillText: { fontSize: 8, fontWeight: "800" as const, letterSpacing: 1.2 },
   separator: { width: 1, height: 16 },
-  scrollWrap: { flex: 1, overflow: "hidden", height: 34, justifyContent: "center", marginLeft: 6, position: "relative" as const },
-  scrollHighlight: { position: "absolute" as const, top: 5, left: 3, right: 3, bottom: 5, borderRadius: 4 },
-  scrollText: { fontSize: 10, letterSpacing: 0.24, width: 5000 },
-  fadeEdgeLeft: { position: "absolute" as const, top: 0, left: 0, bottom: 0, width: 12, opacity: 0.54 },
-  fadeEdgeRight: { position: "absolute" as const, top: 0, right: 0, bottom: 0, width: 16, opacity: 0.6 },
+  scrollWrap: { flex: 1, overflow: "hidden", height: 34, justifyContent: "center", marginLeft: 8, position: "relative" as const },
+  scrollHighlight: { position: "absolute" as const, top: 0, left: 0, right: 0, bottom: 0 },
+  scrollText: { fontSize: 10, letterSpacing: 0.3, width: 5000 },
+  fadeEdgeLeft: { position: "absolute" as const, top: 0, left: 0, bottom: 0, width: 16, opacity: 0.7 },
+  fadeEdgeRight: { position: "absolute" as const, top: 0, right: 0, bottom: 0, width: 24, opacity: 0.8 },
 });
 
 const cmdStyles = StyleSheet.create({
@@ -777,17 +777,17 @@ const liveStyles = StyleSheet.create({
     justifyContent: "space-between",
     alignItems: "center",
     paddingHorizontal: 16,
-    paddingTop: 14,
-    paddingBottom: 16,
-    minHeight: 92,
+    paddingTop: 12,
+    paddingBottom: 14,
+    minHeight: 82,
   },
-  topBarLeft: { width: 64, alignItems: "flex-start" },
+  topBarLeft: { width: 56, alignItems: "flex-start" },
   topBarCenter: { flex: 1, alignItems: "center", justifyContent: "center" },
   pulseTitleRow: { flexDirection: "row", alignItems: "center" },
-  pulseLetter: { fontSize: 34, fontWeight: "900" as const, letterSpacing: 1.9 },
-  liveCountLabel: { fontSize: 10, letterSpacing: 1.6, fontWeight: "800" as const },
-  liveCountValue: { fontSize: 22, lineHeight: 26, fontWeight: "900" as const },
-  liveCountSub: { fontSize: 10, letterSpacing: 0.9 },
+  pulseLetter: { fontSize: 30, fontWeight: "900" as const, letterSpacing: 1.6 },
+  liveCountLabel: { fontSize: 9, letterSpacing: 1.4, fontWeight: "800" as const },
+  liveCountValue: { fontSize: 20, lineHeight: 24, fontWeight: "900" as const },
+  liveCountSub: { fontSize: 9, letterSpacing: 0.8 },
   liveBadge: {
     flexDirection: "row",
     alignItems: "center",
