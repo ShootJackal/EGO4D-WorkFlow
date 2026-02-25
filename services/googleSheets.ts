@@ -1,9 +1,5 @@
 import { Collector, Task, LogEntry, SubmitPayload, SubmitResponse, CollectorStats, TaskActualRow, FullLogEntry, AdminDashboardData, LeaderboardEntry } from "@/types";
 
-function normalizeCollectorName(name: string): string {
-  return name.replace(/\s*\(.*?\)\s*$/g, "").trim();
-}
-
 function getScriptUrl(): string {
   return process.env.EXPO_PUBLIC_GOOGLE_SCRIPT_URL ?? "";
 }
@@ -190,71 +186,6 @@ export async function buildLeaderboardFromCollectors(collectors: { name: string;
 
   console.log("[API] Built leaderboard with", results.length, "entries");
   return results;
-}
-
-export async function buildLeaderboardFromFullLog(collectors: { name: string; rigs: string[] }[]): Promise<LeaderboardEntry[]> {
-  console.log("[API] buildLeaderboardFromFullLog for", collectors.length, "collectors");
-  const SF_NAMES = new Set(["tony a", "veronika t", "travis b"]);
-
-  try {
-    const fullLog = await fetchFullLog();
-    const collectorMap = new Map<string, { name: string; rigs: string[] }>();
-    collectors.forEach((collector) => {
-      collectorMap.set(normalizeCollectorName(collector.name).toLowerCase(), collector);
-    });
-
-    const aggregateMap = new Map<string, LeaderboardEntry>();
-
-    fullLog.forEach((entry) => {
-      const normalizedName = normalizeCollectorName(entry.collector);
-      if (!normalizedName) return;
-      const key = normalizedName.toLowerCase();
-
-      const collectorInfo = collectorMap.get(key);
-      const hasSFRig = collectorInfo?.rigs?.some((rig) => rig.toUpperCase().includes("SF")) ?? false;
-      const isSFByName = SF_NAMES.has(key.replace(/\.$/, "").trim());
-      const region = hasSFRig || isSFByName ? "SF" : "MX";
-
-      const existing = aggregateMap.get(key);
-      if (!existing) {
-        aggregateMap.set(key, {
-          rank: 0,
-          collectorName: normalizedName,
-          hoursLogged: Math.max(0, Number(entry.loggedHours) || 0),
-          tasksCompleted: entry.status === "Completed" ? 1 : 0,
-          tasksAssigned: 1,
-          completionRate: 0,
-          region,
-        });
-        return;
-      }
-
-      existing.hoursLogged += Math.max(0, Number(entry.loggedHours) || 0);
-      existing.tasksAssigned += 1;
-      if (entry.status === "Completed") {
-        existing.tasksCompleted += 1;
-      }
-    });
-
-    const results = Array.from(aggregateMap.values()).map((entry) => {
-      const completionRate = entry.tasksAssigned > 0 ? (entry.tasksCompleted / entry.tasksAssigned) * 100 : 0;
-      return {
-        ...entry,
-        completionRate,
-      };
-    });
-
-    results.sort((a, b) => b.hoursLogged - a.hoursLogged);
-    results.forEach((entry, index) => {
-      entry.rank = index + 1;
-    });
-
-    console.log("[API] Built leaderboard from full log with", results.length, "entries");
-    return results;
-  } catch (error) {
-    console.log("[API] buildLeaderboardFromFullLog failed", error);
-    return [];
-  }
 }
 
 export function isApiConfigured(): boolean {

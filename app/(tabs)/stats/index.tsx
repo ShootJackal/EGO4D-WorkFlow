@@ -16,7 +16,7 @@ import { TrendingUp, Clock, CheckCircle, Target, Inbox, Calendar, Trophy, Medal,
 import { Image } from "expo-image";
 import { useCollection } from "@/providers/CollectionProvider";
 import { useTheme } from "@/providers/ThemeProvider";
-import { fetchCollectorStats, fetchLeaderboard, buildLeaderboardFromCollectors, buildLeaderboardFromFullLog } from "@/services/googleSheets";
+import { fetchCollectorStats, fetchLeaderboard, buildLeaderboardFromCollectors } from "@/services/googleSheets";
 import { CollectorStats, LeaderboardEntry } from "@/types";
 
 const FONT_MONO = Platform.select({ ios: "Courier New", android: "monospace", default: "monospace" });
@@ -225,10 +225,7 @@ export default function StatsScreen() {
       const apiData = await fetchLeaderboard();
       if (apiData && apiData.length > 0) return apiData;
       if (collectors.length > 0) {
-        console.log("[Stats] Building leaderboard from full log fallback");
-        const fullLogData = await buildLeaderboardFromFullLog(collectors);
-        if (fullLogData.length > 0) return fullLogData;
-        console.log("[Stats] Building leaderboard from collectors stats fallback");
+        console.log("[Stats] Building leaderboard from collectors fallback");
         return buildLeaderboardFromCollectors(collectors);
       }
       return [];
@@ -492,7 +489,7 @@ export default function StatsScreen() {
         </View>
       )}
 
-      {(statsQuery.isLoading || leaderboardQuery.isLoading) && !stats && leaderboard.length === 0 && (
+      {statsQuery.isLoading && (
         <View style={styles.loadingWrap}>
           <ActivityIndicator size="small" color={colors.accent} />
           <Text style={[styles.loadingText, { color: colors.textMuted }]}>Loading stats...</Text>
