@@ -10,7 +10,20 @@ import { CollectionProvider } from "@/providers/CollectionProvider";
 
 SplashScreen.preventAutoHideAsync();
 
-const queryClient = new QueryClient();
+const queryClient = new QueryClient({
+  defaultOptions: {
+    queries: {
+      retry: 2,
+      refetchOnWindowFocus: false,
+      refetchOnReconnect: true,
+      networkMode: "online",
+    },
+    mutations: {
+      retry: 1,
+      networkMode: "online",
+    },
+  },
+});
 
 const FONT_MONO = Platform.select({ ios: "Courier New", android: "monospace", default: "monospace" });
 

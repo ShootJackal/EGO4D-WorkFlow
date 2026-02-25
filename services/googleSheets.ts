@@ -2,6 +2,11 @@ import { Collector, Task, LogEntry, SubmitPayload, SubmitResponse, CollectorStat
 
 const DEFAULT_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbzvhVIEe-P-aqiy1UwOWXPSXan0nwLMD5tkDJhrLX7gXsRn3-nCkB4f3Ov7K12dpH_Z6g/exec";
 const REQUEST_TIMEOUT_MS = 15000;
+const MAX_RETRY_ATTEMPTS = 2;
+const RETRYABLE_STATUS_CODES = new Set([408, 429, 500, 502, 503, 504]);
+const RETRYABLE_ERROR_PATTERNS = [/network/i, /timeout/i, /abort/i, /failed to fetch/i];
+const RETRY_DELAY_MS = [400, 1200];
+
 
 function normalizeScriptUrl(raw: string): string {
   const trimmed = raw.trim().replace(/^['"]|['"]$/g, "");
@@ -28,10 +33,24 @@ interface ApiResponse<T> {
   message?: string;
 }
 
-function createTimeoutSignal(ms: number): AbortSignal {
+function createTimeoutController(ms: number): { controller: AbortController; cancel: () => void } {
   const controller = new AbortController();
-  setTimeout(() => controller.abort(), ms);
-  return controller.signal;
+  const timer = setTimeout(() => controller.abort(), ms);
+  return {
+    controller,
+    cancel: () => clearTimeout(timer),
+  };
+}
+
+function sleep(ms: number): Promise<void> {
+  return new Promise((resolve) => {
+    setTimeout(resolve, ms);
+  });
+}
+
+function shouldRetryError(error: unknown): boolean {
+  const message = error instanceof Error ? error.message : String(error ?? "");
+  return RETRYABLE_ERROR_PATTERNS.some((pattern) => pattern.test(message));
 }
 
 function tryParseResponseText<T>(text: string): ApiResponse<T> {
@@ -68,33 +87,51 @@ async function apiGet<T>(action: string, params: Record<string, string> = {}): P
 
   console.log("[API] GET", action, params);
 
-  let response: Response;
-  try {
-    response = await fetch(url.toString(), {
-      redirect: "follow",
-      signal: createTimeoutSignal(REQUEST_TIMEOUT_MS),
-      cache: "no-store",
-    });
-  } catch (error) {
-    const message = error instanceof Error ? error.message : "Network error";
-    console.log("[API] GET request failed:", message);
-    throw new Error(`Request failed: ${message}`);
+  for (let attempt = 0; attempt <= MAX_RETRY_ATTEMPTS; attempt += 1) {
+    const timeout = createTimeoutController(REQUEST_TIMEOUT_MS);
+
+    try {
+      const response = await fetch(url.toString(), {
+        redirect: "follow",
+        signal: timeout.controller.signal,
+        cache: "no-store",
+      });
+
+      timeout.cancel();
+
+      if (!response.ok) {
+        const text = await response.text();
+        const retryableStatus = RETRYABLE_STATUS_CODES.has(response.status);
+        console.log("[API] GET HTTP error:", response.status, "retryable:", retryableStatus, text);
+        if (retryableStatus && attempt < MAX_RETRY_ATTEMPTS) {
+          await sleep(RETRY_DELAY_MS[attempt] ?? 1500);
+          continue;
+        }
+        throw new Error(`HTTP ${response.status}: ${text || "Request failed"}`);
+      }
+
+      const json = await parseApiResponse<T>(response);
+      console.log("[API] Response:", JSON.stringify(json).slice(0, 500));
+
+      if (!json.success) {
+        throw new Error(json.error ?? json.message ?? "Unknown API error");
+      }
+
+      return json.data as T;
+    } catch (error) {
+      timeout.cancel();
+      const message = error instanceof Error ? error.message : "Network error";
+      const canRetry = attempt < MAX_RETRY_ATTEMPTS && shouldRetryError(error);
+      console.log("[API] GET request failed:", message, "attempt:", attempt + 1, "retry:", canRetry);
+      if (canRetry) {
+        await sleep(RETRY_DELAY_MS[attempt] ?? 1500);
+        continue;
+      }
+      throw new Error(`Request failed: ${message}`);
+    }
   }
 
-  if (!response.ok) {
-    const text = await response.text();
-    console.log("[API] HTTP error:", response.status, text);
-    throw new Error(`HTTP ${response.status}: ${text || "Request failed"}`);
-  }
-
-  const json = await parseApiResponse<T>(response);
-  console.log("[API] Response:", JSON.stringify(json).slice(0, 500));
-
-  if (!json.success) {
-    throw new Error(json.error ?? json.message ?? "Unknown API error");
-  }
-
-  return json.data as T;
+  throw new Error("Request failed after retries");
 }
 
 async function apiPost(payload: SubmitPayload): Promise<SubmitResponse> {
@@ -105,40 +142,58 @@ async function apiPost(payload: SubmitPayload): Promise<SubmitResponse> {
 
   console.log("[API] POST submit:", JSON.stringify(payload));
 
-  let response: Response;
-  try {
-    response = await fetch(scriptUrl, {
-      method: "POST",
-      headers: { "Content-Type": "text/plain" },
-      body: JSON.stringify(payload),
-      redirect: "follow",
-      signal: createTimeoutSignal(REQUEST_TIMEOUT_MS),
-      cache: "no-store",
-    });
-  } catch (error) {
-    const message = error instanceof Error ? error.message : "Network error";
-    console.log("[API] POST request failed:", message);
-    throw new Error(`Submit failed: ${message}`);
+  for (let attempt = 0; attempt <= MAX_RETRY_ATTEMPTS; attempt += 1) {
+    const timeout = createTimeoutController(REQUEST_TIMEOUT_MS);
+
+    try {
+      const response = await fetch(scriptUrl, {
+        method: "POST",
+        headers: { "Content-Type": "text/plain" },
+        body: JSON.stringify(payload),
+        redirect: "follow",
+        signal: timeout.controller.signal,
+        cache: "no-store",
+      });
+
+      timeout.cancel();
+
+      if (!response.ok) {
+        const text = await response.text();
+        const retryableStatus = RETRYABLE_STATUS_CODES.has(response.status);
+        console.log("[API] POST HTTP error:", response.status, "retryable:", retryableStatus, text);
+        if (retryableStatus && attempt < MAX_RETRY_ATTEMPTS) {
+          await sleep(RETRY_DELAY_MS[attempt] ?? 1500);
+          continue;
+        }
+        throw new Error(`HTTP ${response.status}: ${text || "Submit failed"}`);
+      }
+
+      const json = await parseApiResponse<SubmitResponse>(response);
+      console.log("[API] POST response:", JSON.stringify(json));
+
+      if (!json.success) {
+        throw new Error(json.error ?? json.message ?? "Submit failed");
+      }
+
+      return {
+        success: true,
+        message: json.message ?? "Success",
+        ...json.data,
+      } as SubmitResponse;
+    } catch (error) {
+      timeout.cancel();
+      const message = error instanceof Error ? error.message : "Network error";
+      const canRetry = attempt < MAX_RETRY_ATTEMPTS && shouldRetryError(error);
+      console.log("[API] POST request failed:", message, "attempt:", attempt + 1, "retry:", canRetry);
+      if (canRetry) {
+        await sleep(RETRY_DELAY_MS[attempt] ?? 1500);
+        continue;
+      }
+      throw new Error(`Submit failed: ${message}`);
+    }
   }
 
-  if (!response.ok) {
-    const text = await response.text();
-    console.log("[API] POST HTTP error:", response.status, text);
-    throw new Error(`HTTP ${response.status}: ${text || "Submit failed"}`);
-  }
-
-  const json = await parseApiResponse<SubmitResponse>(response);
-  console.log("[API] POST response:", JSON.stringify(json));
-
-  if (!json.success) {
-    throw new Error(json.error ?? json.message ?? "Submit failed");
-  }
-
-  return {
-    success: true,
-    message: json.message ?? "Success",
-    ...json.data,
-  } as SubmitResponse;
+  throw new Error("Submit failed after retries");
 }
 
 interface RawCollector {
