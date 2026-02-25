@@ -21,6 +21,7 @@ import { fetchTodayLog, fetchCollectorStats, fetchRecollections, isApiConfigured
 
 const { width: SCREEN_WIDTH } = Dimensions.get("window");
 const FONT_MONO = Platform.select({ ios: "Courier New", android: "monospace", default: "monospace" });
+const FONT_LEXEND = Platform.select({ ios: "Lexend", android: "Lexend", default: "Lexend" });
 const SF_KNOWN_NAMES = new Set(["tony a", "veronika t", "travis b"]);
 
 function normalizeCollectorName(name: string): string {
@@ -42,6 +43,54 @@ interface TickerSegment {
   color: string;
   items: string[];
   speed: number;
+}
+
+function PulseTitle({ text, color }: { text: string; color: string }) {
+  const letters = text.split("");
+  const anims = useRef<Animated.Value[]>(letters.map(() => new Animated.Value(0.7))).current;
+
+  useEffect(() => {
+    let mounted = true;
+    let timeoutRef: ReturnType<typeof setTimeout> | null = null;
+
+    const run = () => {
+      if (!mounted || anims.length === 0) return;
+      const index = Math.floor(Math.random() * anims.length);
+      Animated.sequence([
+        Animated.timing(anims[index], { toValue: 1, duration: 300, useNativeDriver: true }),
+        Animated.timing(anims[index], { toValue: 0.7, duration: 500, useNativeDriver: true }),
+      ]).start();
+      timeoutRef = setTimeout(run, 450 + Math.floor(Math.random() * 700));
+    };
+
+    run();
+
+    return () => {
+      mounted = false;
+      if (timeoutRef) clearTimeout(timeoutRef);
+    };
+  }, [anims]);
+
+  return (
+    <View style={liveStyles.pulseTitleRow} testID="live-pulse-title">
+      {letters.map((letter, index) => (
+        <Animated.Text
+          key={`title_${letter}_${index}`}
+          style={[
+            liveStyles.pulseLetter,
+            {
+              color,
+              fontFamily: FONT_LEXEND,
+              opacity: anims[index],
+              transform: [{ scale: anims[index].interpolate({ inputRange: [0.7, 1], outputRange: [1, 1.06] }) }],
+            },
+          ]}
+        >
+          {letter}
+        </Animated.Text>
+      ))}
+    </View>
+  );
 }
 
 function NewsTicker({ segments }: { segments: TickerSegment[] }) {
@@ -115,7 +164,7 @@ function NewsTicker({ segments }: { segments: TickerSegment[] }) {
   const tickerText = seg.items.join("   |   ");
 
   const fadeOpacity = scrollX.interpolate({
-    inputRange: [SCREEN_WIDTH * 0.8, SCREEN_WIDTH * 1.2],
+    inputRange: [SCREEN_WIDTH * 0.7, SCREEN_WIDTH * 1.2],
     outputRange: [1, 0],
     extrapolate: 'clamp',
   });
@@ -137,7 +186,7 @@ function NewsTicker({ segments }: { segments: TickerSegment[] }) {
       </Animated.View>
       <View style={[tickerStyles.separator, { backgroundColor: isDark ? '#2E2E34' : '#E0DCD0' }]} />
       <View style={tickerStyles.scrollWrap}>
-        <View style={[tickerStyles.scrollHighlight, { backgroundColor: seg.color + (isDark ? '12' : '0A') }]} />
+        <View style={[tickerStyles.scrollHighlight, { backgroundColor: seg.color + (isDark ? '0A' : '08') }]} />
         <Animated.Text
           style={[tickerStyles.scrollText, {
             color: seg.color,
@@ -559,28 +608,37 @@ export default function LiveScreen() {
   }, [toggleTheme]);
 
   const livePillColor = isDark ? colors.terminalGreen : '#2D8A56';
+  const liveRigCount = useMemo(() => {
+    if (isFeeding) return "--";
+    const logData = todayLogQuery.data ?? todayLog;
+    const rigs = new Set<string>();
+    logData.forEach((entry) => {
+      const raw = normalizeCollectorName(entry.assignmentId ?? "");
+      if (raw) rigs.add(raw);
+    });
+    if (rigs.size > 0) return String(rigs.size);
+    return String(totalRigCount);
+  }, [isFeeding, todayLogQuery.data, todayLog, totalRigCount]);
 
   return (
     <View style={[liveStyles.container, { backgroundColor: colors.bg, paddingTop: insets.top }]}>
       <View style={liveStyles.topBar}>
-        <View style={liveStyles.topBarLeft}>
-          <View style={liveStyles.brandRow}>
-            <Text style={[liveStyles.brandText, { color: colors.accent, fontFamily: FONT_MONO }]}>
-              TASKFLOW
+        <View style={liveStyles.topBarLeft} testID="live-rig-count-stack">
+          <Text style={[liveStyles.liveCountLabel, { color: colors.terminalDim, fontFamily: FONT_MONO }]}>LIVE</Text>
+          <Text style={[liveStyles.liveCountValue, { color: livePillColor, fontFamily: FONT_MONO }]}>{liveRigCount}</Text>
+          <Text style={[liveStyles.liveCountSub, { color: colors.textMuted, fontFamily: FONT_MONO }]}>rigs</Text>
+        </View>
+        <View style={liveStyles.topBarCenter}>
+          <PulseTitle text="TASKFLOW" color={colors.accent} />
+          <View style={[liveStyles.liveBadge, {
+            backgroundColor: isOnline ? livePillColor + '14' : colors.cancel + '14',
+            borderColor: isOnline ? livePillColor + '40' : colors.cancel + '40',
+          }]}>
+            <View style={[liveStyles.liveDot, { backgroundColor: isOnline ? livePillColor : colors.cancel }]} />
+            <Text style={[liveStyles.liveLabel, { color: isOnline ? livePillColor : colors.cancel, fontFamily: FONT_MONO }]}>
+              {isOnline ? "LIVE" : "OFF"}
             </Text>
-            <View style={[liveStyles.liveBadge, {
-              backgroundColor: isOnline ? livePillColor + '14' : colors.cancel + '14',
-              borderColor: isOnline ? livePillColor + '40' : colors.cancel + '40',
-            }]}>
-              <View style={[liveStyles.liveDot, { backgroundColor: isOnline ? livePillColor : colors.cancel }]} />
-              <Text style={[liveStyles.liveLabel, { color: isOnline ? livePillColor : colors.cancel, fontFamily: FONT_MONO }]}>
-                {isOnline ? "LIVE" : "OFF"}
-              </Text>
-            </View>
           </View>
-          <Text style={[liveStyles.rigCountText, { color: colors.textMuted, fontFamily: FONT_MONO }]}>
-            {totalRigCount} rigs active
-          </Text>
         </View>
         <View style={liveStyles.topBarRight}>
           <TouchableOpacity
@@ -717,14 +775,19 @@ const liveStyles = StyleSheet.create({
   topBar: {
     flexDirection: "row",
     justifyContent: "space-between",
-    alignItems: "flex-start",
+    alignItems: "center",
     paddingHorizontal: 16,
-    paddingTop: 10,
-    paddingBottom: 12,
+    paddingTop: 12,
+    paddingBottom: 14,
+    minHeight: 82,
   },
-  topBarLeft: { flex: 1 },
-  brandRow: { flexDirection: "row", alignItems: "center", gap: 8 },
-  brandText: { fontSize: 26, fontWeight: "900" as const, letterSpacing: 5 },
+  topBarLeft: { width: 56, alignItems: "flex-start" },
+  topBarCenter: { flex: 1, alignItems: "center", justifyContent: "center" },
+  pulseTitleRow: { flexDirection: "row", alignItems: "center" },
+  pulseLetter: { fontSize: 30, fontWeight: "900" as const, letterSpacing: 1.6 },
+  liveCountLabel: { fontSize: 9, letterSpacing: 1.4, fontWeight: "800" as const },
+  liveCountValue: { fontSize: 20, lineHeight: 24, fontWeight: "900" as const },
+  liveCountSub: { fontSize: 9, letterSpacing: 0.8 },
   liveBadge: {
     flexDirection: "row",
     alignItems: "center",
@@ -737,7 +800,7 @@ const liveStyles = StyleSheet.create({
   liveDot: { width: 6, height: 6, borderRadius: 3 },
   liveLabel: { fontSize: 9, fontWeight: "800" as const, letterSpacing: 1.2 },
   rigCountText: { fontSize: 10, marginTop: 3, letterSpacing: 0.5 },
-  topBarRight: { flexDirection: "row", gap: 8 },
+  topBarRight: { flexDirection: "row", gap: 8, width: 128, justifyContent: "flex-end" },
   iconBtn: {
     width: 38,
     height: 38,
