@@ -222,14 +222,23 @@ export default function StatsScreen() {
   const leaderboardQuery = useQuery<LeaderboardEntry[]>({
     queryKey: ["leaderboard", collectors.length],
     queryFn: async () => {
-      const apiData = await fetchLeaderboard();
+      const withTimeout = async <T,>(promise: Promise<T>, timeoutMs: number): Promise<T> => {
+        return Promise.race<T>([
+          promise,
+          new Promise<T>((_, reject) => {
+            setTimeout(() => reject(new Error(`Leaderboard request timeout after ${timeoutMs}ms`)), timeoutMs);
+          }),
+        ]);
+      };
+
+      const apiData = await withTimeout(fetchLeaderboard(), 9000);
       if (apiData && apiData.length > 0) return apiData;
       if (collectors.length > 0) {
         console.log("[Stats] Building leaderboard from full log fallback");
-        const fullLogData = await buildLeaderboardFromFullLog(collectors);
+        const fullLogData = await withTimeout(buildLeaderboardFromFullLog(collectors), 9000);
         if (fullLogData.length > 0) return fullLogData;
         console.log("[Stats] Building leaderboard from collectors stats fallback");
-        return buildLeaderboardFromCollectors(collectors);
+        return withTimeout(buildLeaderboardFromCollectors(collectors), 9000);
       }
       return [];
     },
@@ -308,6 +317,13 @@ export default function StatsScreen() {
   ];
 
   const currentLbEntries = lbTab === "sf" ? sfEntries : lbTab === "mx" ? mxEntries : leaderboard;
+
+  const shouldShowLoading =
+    (statsQuery.isPending || leaderboardQuery.isPending) &&
+    !statsQuery.error &&
+    !leaderboardQuery.error &&
+    !stats &&
+    leaderboard.length === 0;
 
   if (!selectedCollector) {
     return (
@@ -492,7 +508,7 @@ export default function StatsScreen() {
         </View>
       )}
 
-      {(statsQuery.isLoading || leaderboardQuery.isLoading) && !stats && leaderboard.length === 0 && (
+      {shouldShowLoading && (
         <View style={styles.loadingWrap}>
           <ActivityIndicator size="small" color={colors.accent} />
           <Text style={[styles.loadingText, { color: colors.textMuted }]}>Loading stats...</Text>
