@@ -41,6 +41,13 @@ export const [ThemeProvider, useTheme] = createContextHook(() => {
     await setThemeMode(next);
   }, [isDark, setThemeMode]);
 
+  const cycleThemeMode = useCallback(async () => {
+    const order: ThemeMode[] = ["light", "dark", "system"];
+    const idx = order.indexOf(mode);
+    const next = order[(idx + 1) % order.length];
+    await setThemeMode(next);
+  }, [mode, setThemeMode]);
+
   return {
     mode,
     isDark,
@@ -48,5 +55,6 @@ export const [ThemeProvider, useTheme] = createContextHook(() => {
     loaded,
     setThemeMode,
     toggleTheme,
+    cycleThemeMode,
   };
 });

@@ -223,8 +223,8 @@ export default function DashboardScreen() {
   const cardShadow = {
     shadowColor: colors.shadow,
     shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.06,
-    shadowRadius: 10,
+    shadowOpacity: 0.08,
+    shadowRadius: 12,
     elevation: 3,
   };
 
@@ -243,7 +243,17 @@ export default function DashboardScreen() {
             <RefreshControl refreshing={refreshing} onRefresh={handleRefresh} tintColor={colors.accent} colors={[colors.accent]} />
           }
         >
-          <View style={[styles.header, { borderBottomColor: colors.border }]}>
+          <View
+            style={[
+              styles.header,
+              styles.headerElevated,
+              {
+                backgroundColor: colors.headerBg,
+                borderBottomColor: colors.headerBorder,
+                shadowColor: colors.shadow,
+              },
+            ]}
+          >
             <View style={styles.headerLeft}>
               <Text style={[styles.brandText, { color: colors.accent, fontFamily: FONT_MONO }]}>
                 {t.headers.collect}
@@ -511,7 +521,16 @@ const styles = StyleSheet.create({
     alignItems: "flex-start",
     marginBottom: 18,
     paddingBottom: 12,
+    paddingHorizontal: 4,
+    paddingTop: 4,
     borderBottomWidth: 1,
+    borderRadius: 12,
+  },
+  headerElevated: {
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.06,
+    shadowRadius: 8,
+    elevation: 2,
   },
   headerLeft: {},
   headerRight: { alignItems: "flex-end", gap: 4 },

@@ -1,4 +1,5 @@
 import { Tabs } from "expo-router";
+import { LinearGradient } from "expo-linear-gradient";
 import { Send, Wrench, BarChart3, Radio } from "lucide-react-native";
 import React, { useRef, useCallback, useMemo } from "react";
 import {
@@ -15,7 +16,7 @@ import { useLanguage } from "@/providers/LanguageProvider";
 
 const { width: SCREEN_WIDTH } = Dimensions.get("window");
 
-const TAB_ORDER = ["index", "live", "stats", "tools"] as const;
+const TAB_ORDER = ["live", "index", "stats", "tools"] as const;
 type TabName = (typeof TAB_ORDER)[number];
 
 function CustomTabBar({ state, navigation }: { state: any; navigation: any }) {
@@ -65,7 +66,10 @@ function CustomTabBar({ state, navigation }: { state: any; navigation: any }) {
 
   const BOTTOM_PAD = insets.bottom > 0 ? insets.bottom : 12;
 
-  const fadeBg = isDark ? 'rgba(18,18,20,0.95)' : 'rgba(250,248,243,0.95)';
+  const fadeBg = isDark ? "rgba(18,18,20,0.95)" : "rgba(250,248,243,0.95)";
+  const islandTop = isDark ? "#25252A" : "#FFFFFF";
+  const islandBottom = isDark ? "#1A1A1E" : "#F5F3EF";
+  const shadowColor = colors.shadow;
 
   return (
     <View style={[barStyles.outerWrap, { paddingBottom: BOTTOM_PAD }]}>
@@ -77,12 +81,16 @@ function CustomTabBar({ state, navigation }: { state: any; navigation: any }) {
         style={[
           barStyles.island,
           {
-            backgroundColor: isDark ? '#1E1E22' : '#FFFFFF',
-            shadowColor: isDark ? '#000' : '#1A1400',
-            borderColor: isDark ? '#2E2E34' : '#E5E1D8',
+            shadowColor,
+            borderColor: isDark ? "#2E2E34" : "#E5E1D8",
           },
         ]}
       >
+        <LinearGradient
+          colors={[islandTop, islandBottom]}
+          style={StyleSheet.absoluteFill}
+          pointerEvents="none"
+        />
         <Animated.View
           style={[
             barStyles.slider,
@@ -168,6 +176,7 @@ export default function TabLayout() {
         tabBarInactiveTintColor: colors.textMuted,
       }}
     >
+      <Tabs.Screen name="live" options={{ title: "LIVE" }} />
       <Tabs.Screen
         name="index"
         options={{
@@ -175,7 +184,6 @@ export default function TabLayout() {
           headerShown: false,
         }}
       />
-      <Tabs.Screen name="live" options={{ title: "LIVE" }} />
       <Tabs.Screen name="stats" options={{ title: "Stats" }} />
       <Tabs.Screen name="tools" options={{ title: "Tools" }} />
     </Tabs>
@@ -203,10 +211,10 @@ const barStyles = StyleSheet.create({
     borderRadius: 28,
     borderWidth: 1,
     paddingVertical: 6,
-    shadowOffset: { width: 0, height: -6 },
-    shadowOpacity: 0.14,
-    shadowRadius: 28,
-    elevation: 22,
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.12,
+    shadowRadius: 20,
+    elevation: 12,
     position: "relative",
     overflow: "hidden",
     width: "100%",

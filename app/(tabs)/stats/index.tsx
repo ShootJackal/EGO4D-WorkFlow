@@ -316,7 +316,7 @@ export default function StatsScreen() {
 
   const stats = statsQuery.data;
 
-  const cardShadow = { shadowColor: colors.shadow, shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.05, shadowRadius: 12, elevation: 3 };
+  const cardShadow = { shadowColor: colors.shadow, shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.08, shadowRadius: 12, elevation: 3 };
 
   const tabItems: { key: LeaderboardTab; label: string; color: string }[] = [
     { key: "combined", label: "All", color: colors.accent },
@@ -348,7 +348,17 @@ export default function StatsScreen() {
       showsVerticalScrollIndicator={false}
       refreshControl={<RefreshControl refreshing={refreshing} onRefresh={handleRefresh} tintColor={colors.accent} colors={[colors.accent]} />}
     >
-      <View style={[styles.pageHeader, { borderBottomColor: colors.border }]}>
+      <View
+        style={[
+          styles.pageHeader,
+          styles.pageHeaderElevated,
+          {
+            backgroundColor: colors.headerBg,
+            borderBottomColor: colors.headerBorder,
+            shadowColor: colors.shadow,
+          },
+        ]}
+      >
         <View>
           <Text style={[styles.brandText, { color: colors.accent, fontFamily: FONT_MONO }]}>{t.headers.stats}</Text>
           <Text style={[styles.brandSub, { color: colors.textMuted, fontFamily: FONT_MONO }]}>
@@ -607,8 +617,21 @@ const styles = StyleSheet.create({
   container: { flex: 1 },
   content: { padding: 20, paddingBottom: 140 },
   pageHeader: {
-    flexDirection: "row", justifyContent: "space-between", alignItems: "flex-end",
-    marginBottom: 22, paddingBottom: 12, borderBottomWidth: 1,
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "flex-end",
+    marginBottom: 22,
+    paddingBottom: 12,
+    paddingHorizontal: 4,
+    paddingTop: 4,
+    borderBottomWidth: 1,
+    borderRadius: 12,
+  },
+  pageHeaderElevated: {
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.06,
+    shadowRadius: 8,
+    elevation: 2,
   },
   pageHeaderRight: { alignItems: "flex-end", gap: 4 },
   headerLogo: {

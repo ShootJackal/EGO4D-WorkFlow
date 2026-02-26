@@ -5,21 +5,20 @@ import {
   StyleSheet,
   ScrollView,
   Animated,
-  Dimensions,
   Platform,
   TouchableOpacity,
   Modal,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { RefreshCw, Sun, Moon, BookOpen, Trophy, X, User } from "lucide-react-native";
+import { RefreshCw, Sun, Moon, Monitor, BookOpen, Trophy, X, User } from "lucide-react-native";
 import * as Haptics from "expo-haptics";
 import { router } from "expo-router";
 import { useTheme } from "@/providers/ThemeProvider";
 import { useCollection } from "@/providers/CollectionProvider";
 import { useQuery } from "@tanstack/react-query";
 import { fetchTodayLog, fetchCollectorStats, fetchRecollections, isApiConfigured } from "@/services/googleSheets";
+import AnnouncementTicker, { type TickerSegment } from "@/components/AnnouncementTicker";
 
-const { width: SCREEN_WIDTH } = Dimensions.get("window");
 const FONT_MONO = Platform.select({ ios: "Courier New", android: "monospace", default: "monospace" });
 const SF_KNOWN_NAMES = new Set(["tony a", "veronika t", "travis b"]);
 
@@ -35,125 +34,6 @@ interface TerminalLine {
   text: string;
   type: "header" | "data" | "divider" | "empty" | "label" | "cmd" | "prompt";
   color?: string;
-}
-
-interface TickerSegment {
-  label: string;
-  color: string;
-  items: string[];
-  speed: number;
-}
-
-function NewsTicker({ segments }: { segments: TickerSegment[] }) {
-  const { colors, isDark } = useTheme();
-  const [activeIndex, setActiveIndex] = useState(0);
-  const scrollX = useRef(new Animated.Value(SCREEN_WIDTH)).current;
-  const pillSlide = useRef(new Animated.Value(0)).current;
-  const animRef = useRef<Animated.CompositeAnimation | null>(null);
-  const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-
-  const seg = segments[activeIndex] ?? segments[0];
-
-  const startScroll = useCallback((segIndex: number) => {
-    const segment = segments[segIndex];
-    if (!segment) return;
-
-    const tickerText = segment.items.join("     |     ");
-    const textWidth = tickerText.length * 7 + SCREEN_WIDTH;
-    const charSpeed = segment.speed || 28;
-    const duration = Math.max(textWidth * charSpeed, 10000);
-
-    scrollX.setValue(SCREEN_WIDTH * 1.2);
-
-    if (animRef.current) animRef.current.stop();
-
-    const scrollAnim = Animated.timing(scrollX, {
-      toValue: -textWidth + SCREEN_WIDTH * 0.3,
-      duration,
-      useNativeDriver: true,
-    });
-
-    animRef.current = scrollAnim;
-
-    scrollAnim.start(({ finished }) => {
-      if (finished && segments.length > 1) {
-        const nextIdx = (segIndex + 1) % segments.length;
-
-        Animated.timing(pillSlide, {
-          toValue: 1,
-          duration: 300,
-          useNativeDriver: true,
-        }).start(() => {
-          setActiveIndex(nextIdx);
-          pillSlide.setValue(0);
-
-          timerRef.current = setTimeout(() => {
-            startScroll(nextIdx);
-          }, 400);
-        });
-      } else if (finished && segments.length <= 1) {
-        timerRef.current = setTimeout(() => {
-          startScroll(segIndex);
-        }, 2000);
-      }
-    });
-  }, [segments, scrollX, pillSlide]);
-
-  useEffect(() => {
-    setActiveIndex(0);
-    pillSlide.setValue(0);
-    startScroll(0);
-
-    return () => {
-      if (animRef.current) animRef.current.stop();
-      if (timerRef.current) clearTimeout(timerRef.current);
-    };
-  }, [segments.length]);
-
-  if (!seg) return null;
-
-  const tickerText = seg.items.join("   |   ");
-
-  const fadeOpacity = scrollX.interpolate({
-    inputRange: [SCREEN_WIDTH * 0.8, SCREEN_WIDTH * 1.2],
-    outputRange: [1, 0],
-    extrapolate: 'clamp',
-  });
-
-  return (
-    <View style={[tickerStyles.container, {
-      backgroundColor: isDark ? '#161618' : '#F8F6F0',
-      borderBottomColor: isDark ? '#222228' : '#E8E4DA',
-    }]}>
-      <Animated.View style={[tickerStyles.pillWrap, {
-        opacity: pillSlide.interpolate({ inputRange: [0, 0.5, 1], outputRange: [1, 0.3, 1] }),
-      }]}>
-        <View style={[tickerStyles.pill, { backgroundColor: seg.color + '22' }]}>
-          <View style={[tickerStyles.pillDot, { backgroundColor: seg.color }]} />
-          <Text style={[tickerStyles.pillText, { color: seg.color, fontFamily: FONT_MONO }]}>
-            {seg.label}
-          </Text>
-        </View>
-      </Animated.View>
-      <View style={[tickerStyles.separator, { backgroundColor: isDark ? '#2E2E34' : '#E0DCD0' }]} />
-      <View style={tickerStyles.scrollWrap}>
-        <View style={[tickerStyles.scrollHighlight, { backgroundColor: seg.color + (isDark ? '12' : '0A') }]} />
-        <Animated.Text
-          style={[tickerStyles.scrollText, {
-            color: seg.color,
-            fontFamily: FONT_MONO,
-            opacity: fadeOpacity,
-            transform: [{ translateX: scrollX }],
-          }]}
-          numberOfLines={1}
-        >
-          {tickerText}
-        </Animated.Text>
-        <View style={[tickerStyles.fadeEdgeLeft, { backgroundColor: isDark ? '#161618' : '#F8F6F0' }]} pointerEvents="none" />
-        <View style={[tickerStyles.fadeEdgeRight, { backgroundColor: isDark ? '#161618' : '#F8F6F0' }]} pointerEvents="none" />
-      </View>
-    </View>
-  );
 }
 
 function CmdTerminal({ lines, isLoading, onResync, onPersonalStats }: {
@@ -324,7 +204,7 @@ function GuideModal({ visible, onClose }: { visible: boolean; onClose: () => voi
 }
 
 export default function LiveScreen() {
-  const { colors, isDark, toggleTheme } = useTheme();
+  const { colors, isDark, mode, cycleThemeMode } = useTheme();
   const insets = useSafeAreaInsets();
   const { configured, collectors, todayLog, selectedCollectorName } = useCollection();
 
@@ -391,17 +271,18 @@ export default function LiveScreen() {
   const stats = statsQuery.data;
 
   const tickerSegments = useMemo((): TickerSegment[] => {
-    const segs: TickerSegment[] = [];
-    segs.push({
-      label: "ALERT", color: colors.alertYellow,
-      items: ["Welcome to TaskFlow", "Check your daily assignments", "Stay on target"],
-      speed: 32,
-    });
-    segs.push({
-      label: "RECOLLECT", color: colors.recollectRed,
+    const recollectSegment: TickerSegment = {
+      label: "RECOLLECT",
+      color: colors.recollectRed,
       items: recollectItems.length > 0 ? recollectItems : ["No pending recollections"],
       speed: recollectItems.length > 0 ? 22 : 32,
-    });
+    };
+    const alertSegment: TickerSegment = {
+      label: "ALERT",
+      color: colors.alertYellow,
+      items: ["Welcome to TaskFlow", "Check your daily assignments", "Stay on target"],
+      speed: 32,
+    };
     const statsItems: string[] = [];
     if (stats) {
       statsItems.push(`Completion: ${stats.completionRate.toFixed(0)}%`);
@@ -415,8 +296,11 @@ export default function LiveScreen() {
     } else {
       statsItems.push("Loading stats...");
     }
-    segs.push({ label: "STATS", color: colors.statsGreen, items: statsItems, speed: 36 });
-    return segs;
+    const statsSegment: TickerSegment = { label: "STATS", color: colors.statsGreen, items: statsItems, speed: 36 };
+    if (recollectItems.length > 0) {
+      return [recollectSegment, alertSegment, statsSegment];
+    }
+    return [alertSegment, recollectSegment, statsSegment];
   }, [colors, recollectItems, stats]);
 
   const buildTerminalLines = useCallback((): TerminalLine[] => {
@@ -553,16 +437,26 @@ export default function LiveScreen() {
     setLiveLines(prev => [...prev, ...personalLines].slice(-50));
   }, [stats, selectedCollectorName, colors]);
 
-  const handleToggleTheme = useCallback(() => {
+  const handleCycleTheme = useCallback(() => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-    toggleTheme();
-  }, [toggleTheme]);
+    cycleThemeMode();
+  }, [cycleThemeMode]);
 
   const livePillColor = isDark ? colors.terminalGreen : '#2D8A56';
 
   return (
     <View style={[liveStyles.container, { backgroundColor: colors.bg, paddingTop: insets.top }]}>
-      <View style={liveStyles.topBar}>
+      <View
+        style={[
+          liveStyles.topBar,
+          liveStyles.topBarElevated,
+          {
+            backgroundColor: colors.headerBg,
+            borderBottomColor: colors.headerBorder,
+            shadowColor: colors.shadow,
+          },
+        ]}
+      >
         <View style={liveStyles.topBarLeft}>
           <View style={liveStyles.brandRow}>
             <Text style={[liveStyles.brandText, { color: colors.accent, fontFamily: FONT_MONO }]}>
@@ -585,11 +479,13 @@ export default function LiveScreen() {
         <View style={liveStyles.topBarRight}>
           <TouchableOpacity
             style={[liveStyles.iconBtn, { backgroundColor: colors.bgCard, borderColor: colors.border }]}
-            onPress={handleToggleTheme}
+            onPress={handleCycleTheme}
             activeOpacity={0.7}
             testID="theme-toggle-live"
           >
-            {isDark ? <Sun size={15} color={colors.alertYellow} /> : <Moon size={15} color={colors.textSecondary} />}
+            {mode === "light" && <Sun size={15} color={colors.alertYellow} />}
+            {mode === "dark" && <Moon size={15} color={colors.textSecondary} />}
+            {mode === "system" && <Monitor size={15} color={colors.accent} />}
           </TouchableOpacity>
           <TouchableOpacity
             style={[liveStyles.iconBtn, { backgroundColor: colors.bgCard, borderColor: colors.border }]}
@@ -610,7 +506,10 @@ export default function LiveScreen() {
         </View>
       </View>
 
-      <NewsTicker segments={tickerSegments} />
+      <AnnouncementTicker
+        segments={tickerSegments}
+        prioritySegmentIds={recollectItems.length > 0 ? ["RECOLLECT"] : []}
+      />
 
       <ScrollView style={liveStyles.terminalScroll} contentContainerStyle={liveStyles.terminalContent} showsVerticalScrollIndicator={false}>
         <CmdTerminal
@@ -625,33 +524,6 @@ export default function LiveScreen() {
     </View>
   );
 }
-
-const tickerStyles = StyleSheet.create({
-  container: {
-    flexDirection: "row",
-    alignItems: "center",
-    height: 34,
-    overflow: "hidden",
-    borderBottomWidth: 1,
-  },
-  pillWrap: { paddingHorizontal: 10 },
-  pill: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 5,
-    paddingHorizontal: 8,
-    paddingVertical: 3,
-    borderRadius: 4,
-  },
-  pillDot: { width: 5, height: 5, borderRadius: 3 },
-  pillText: { fontSize: 8, fontWeight: "800" as const, letterSpacing: 1.2 },
-  separator: { width: 1, height: 16 },
-  scrollWrap: { flex: 1, overflow: "hidden", height: 34, justifyContent: "center", marginLeft: 8, position: "relative" as const },
-  scrollHighlight: { position: "absolute" as const, top: 0, left: 0, right: 0, bottom: 0 },
-  scrollText: { fontSize: 10, letterSpacing: 0.3, width: 5000 },
-  fadeEdgeLeft: { position: "absolute" as const, top: 0, left: 0, bottom: 0, width: 16, opacity: 0.7 },
-  fadeEdgeRight: { position: "absolute" as const, top: 0, right: 0, bottom: 0, width: 24, opacity: 0.8 },
-});
 
 const cmdStyles = StyleSheet.create({
   window: { borderRadius: 12, borderWidth: 1, overflow: "hidden" },
@@ -721,6 +593,13 @@ const liveStyles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingTop: 10,
     paddingBottom: 12,
+    borderBottomWidth: 1,
+  },
+  topBarElevated: {
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.06,
+    shadowRadius: 8,
+    elevation: 2,
   },
   topBarLeft: { flex: 1 },
   brandRow: { flexDirection: "row", alignItems: "center", gap: 8 },

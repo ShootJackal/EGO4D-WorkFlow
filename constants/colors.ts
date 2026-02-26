@@ -48,6 +48,10 @@ export interface ThemeColors {
 
   shadow: string;
   shadowCard: string;
+  shadowSoft: string;
+
+  headerBg: string;
+  headerBorder: string;
 
   terminal: string;
   terminalBg: string;
@@ -125,7 +129,11 @@ export const LightTheme: ThemeColors = {
   overlay: 'rgba(0,0,0,0.18)',
 
   shadow: '#1A1400',
-  shadowCard: 'rgba(26, 20, 0, 0.06)',
+  shadowCard: 'rgba(26, 20, 0, 0.08)',
+  shadowSoft: 'rgba(26, 20, 0, 0.04)',
+
+  headerBg: '#F5F2EB',
+  headerBorder: '#E8E4DA',
 
   terminal: '#7C3AED',
   terminalBg: '#FAF8F3',
@@ -203,7 +211,11 @@ export const DarkTheme: ThemeColors = {
   overlay: 'rgba(0,0,0,0.6)',
 
   shadow: '#000000',
-  shadowCard: 'rgba(0, 0, 0, 0.35)',
+  shadowCard: 'rgba(0, 0, 0, 0.4)',
+  shadowSoft: 'rgba(0, 0, 0, 0.2)',
+
+  headerBg: '#18181B',
+  headerBorder: '#2A2A2E',
 
   terminal: '#A78BFA',
   terminalBg: '#121214',

@@ -1,0 +1,13 @@
+{
+  "plugins": {
+    "functions": {
+      "enabled": true
+    },
+    "amplitude-analysis": {
+      "enabled": true
+    },
+    "continual-learning": {
+      "enabled": true
+    }
+  }
+}
