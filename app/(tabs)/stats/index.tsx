@@ -12,7 +12,7 @@ import {
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useQuery } from "@tanstack/react-query";
-import { TrendingUp, Clock, CheckCircle, Target, Inbox, Calendar, Trophy, Medal, Crown, Upload, ChevronDown } from "lucide-react-native";
+import { TrendingUp, Clock, CheckCircle, Target, Inbox, Calendar, Trophy, Medal, Crown, Upload, ChevronDown, RefreshCw, AlertCircle } from "lucide-react-native";
 import { Image } from "expo-image";
 import { useCollection } from "@/providers/CollectionProvider";
 import { useTheme } from "@/providers/ThemeProvider";
@@ -20,14 +20,10 @@ import { fetchCollectorStats, fetchLeaderboard, buildLeaderboardFromCollectors }
 import { CollectorStats, LeaderboardEntry } from "@/types";
 
 const FONT_MONO = Platform.select({ ios: "Courier New", android: "monospace", default: "monospace" });
-const SF_KNOWN_NAMES = new Set(["tony a", "veronika t", "travis b"]);
 const LOGO_URI = require("@/assets/images/taskflow-logo.png");
 
 function normalizeCollectorName(name: string): string {
   return name.replace(/\s*\(.*?\)\s*$/g, "").trim();
-}
-function normForMatch(name: string): string {
-  return normalizeCollectorName(name).toLowerCase().replace(/\.$/, "").trim();
 }
 
 type LeaderboardTab = "combined" | "sf" | "mx";
@@ -110,9 +106,11 @@ function LeaderboardRow({ entry, index, isCurrentUser, colors }: { entry: Leader
           <Text style={[lbStyles.name, { color: colors.textPrimary }]} numberOfLines={1}>
             {entry.collectorName}
           </Text>
-          <View style={[lbStyles.regionTag, { backgroundColor: regionColor + '14' }]}>
-            <Text style={[lbStyles.regionText, { color: regionColor }]}>{entry.region}</Text>
-          </View>
+          {entry.region ? (
+            <View style={[lbStyles.regionTag, { backgroundColor: regionColor + '14' }]}>
+              <Text style={[lbStyles.regionText, { color: regionColor }]}>{entry.region}</Text>
+            </View>
+          ) : null}
         </View>
         <View style={lbStyles.statsRow}>
           <Text style={[lbStyles.statVal, { color: colors.accent }]}>{entry.hoursLogged.toFixed(1)}h</Text>
@@ -139,6 +137,28 @@ const lbStyles = StyleSheet.create({
   statsRow: { flexDirection: "row", alignItems: "center", gap: 6, marginBottom: 6 },
   statVal: { fontSize: 11, fontWeight: "500" as const },
   statSep: { fontSize: 10 },
+});
+
+function RetryButton({ onRetry, colors }: { onRetry: () => void; colors: any }) {
+  return (
+    <TouchableOpacity
+      style={[retryStyles.btn, { backgroundColor: colors.accentSoft, borderColor: colors.accentDim }]}
+      onPress={onRetry}
+      activeOpacity={0.7}
+    >
+      <RefreshCw size={13} color={colors.accent} />
+      <Text style={[retryStyles.text, { color: colors.accent, fontFamily: FONT_MONO }]}>RETRY</Text>
+    </TouchableOpacity>
+  );
+}
+
+const retryStyles = StyleSheet.create({
+  btn: {
+    flexDirection: "row", alignItems: "center", justifyContent: "center",
+    gap: 6, paddingVertical: 10, paddingHorizontal: 20,
+    borderRadius: 10, borderWidth: 1, alignSelf: "center", marginTop: 12,
+  },
+  text: { fontSize: 11, fontWeight: "700" as const, letterSpacing: 1 },
 });
 
 function ComparisonCard({ mxHours, sfHours, mxCompleted, sfCompleted, colors }: {
@@ -216,7 +236,7 @@ export default function StatsScreen() {
     queryFn: () => fetchCollectorStats(selectedCollectorName),
     enabled: configured && !!selectedCollectorName,
     staleTime: 60000,
-    retry: 1,
+    retry: 2,
   });
 
   const leaderboardQuery = useQuery<LeaderboardEntry[]>({
@@ -225,14 +245,13 @@ export default function StatsScreen() {
       const apiData = await fetchLeaderboard();
       if (apiData && apiData.length > 0) return apiData;
       if (collectors.length > 0) {
-        console.log("[Stats] Building leaderboard from collectors fallback");
         return buildLeaderboardFromCollectors(collectors);
       }
       return [];
     },
     enabled: configured && collectors.length > 0,
     staleTime: 120000,
-    retry: 1,
+    retry: 2,
   });
 
   const localStats = useMemo(() => {
@@ -253,9 +272,8 @@ export default function StatsScreen() {
     const sf: LeaderboardEntry[] = [];
     const mx: LeaderboardEntry[] = [];
     for (const e of leaderboard) {
-      const isSF = e.region === "SF" || SF_KNOWN_NAMES.has(normForMatch(e.collectorName));
-      if (isSF) sf.push({ ...e, region: "SF" });
-      else mx.push({ ...e, region: "MX" });
+      if (e.region === "SF") sf.push({ ...e });
+      else mx.push({ ...e, region: e.region || "MX" });
     }
     sf.sort((a, b) => b.hoursLogged - a.hoursLogged);
     mx.sort((a, b) => b.hoursLogged - a.hoursLogged);
@@ -283,7 +301,7 @@ export default function StatsScreen() {
       .map(e => ({
         name: e.collectorName,
         tasks: e.tasksCompleted,
-        region: e.region === "SF" || SF_KNOWN_NAMES.has(normForMatch(e.collectorName)) ? "SF" : "MX",
+        region: e.region || "MX",
       }));
   }, [leaderboard]);
 
@@ -315,6 +333,11 @@ export default function StatsScreen() {
       </View>
     );
   }
+
+  const isInitialLoad = statsQuery.isLoading && !statsQuery.data;
+  const isStatsError = statsQuery.isError;
+  const isLbError = leaderboardQuery.isError;
+  const isLbLoading = leaderboardQuery.isLoading && !leaderboardQuery.data;
 
   return (
     <ScrollView
@@ -349,6 +372,21 @@ export default function StatsScreen() {
         <HeroStat label="Uploaded" value={`${localStats.totalLogged.toFixed(1)}h`} icon={<Upload size={18} color={colors.statusPending} />} color={colors.statusPending} index={2} />
         <HeroStat label="Active" value={String(localStats.active)} icon={<TrendingUp size={18} color={colors.accentLight} />} color={colors.accentLight} index={3} />
       </View>
+
+      {isInitialLoad && (
+        <View style={styles.loadingWrap}>
+          <ActivityIndicator size="small" color={colors.accent} />
+          <Text style={[styles.loadingText, { color: colors.textMuted }]}>Loading stats...</Text>
+        </View>
+      )}
+
+      {isStatsError && !stats && (
+        <View style={[styles.errorCard, { backgroundColor: colors.cancelBg, borderColor: colors.cancel + '25' }]}>
+          <AlertCircle size={14} color={colors.cancel} />
+          <Text style={[styles.errorText, { color: colors.cancel }]}>Failed to load stats</Text>
+          <RetryButton onRetry={() => statsQuery.refetch()} colors={colors} />
+        </View>
+      )}
 
       {stats && stats.weeklyLoggedHours > 0 && (
         <>
@@ -446,7 +484,22 @@ export default function StatsScreen() {
         />
       )}
 
-      {currentLbEntries.length > 0 ? (
+      {isLbLoading && (
+        <View style={styles.loadingWrap}>
+          <ActivityIndicator size="small" color={colors.accent} />
+          <Text style={[styles.loadingText, { color: colors.textMuted }]}>Loading leaderboard...</Text>
+        </View>
+      )}
+
+      {isLbError && leaderboard.length === 0 && (
+        <View style={[styles.errorCard, { backgroundColor: colors.cancelBg, borderColor: colors.cancel + '25' }]}>
+          <AlertCircle size={14} color={colors.cancel} />
+          <Text style={[styles.errorText, { color: colors.cancel }]}>Failed to load leaderboard</Text>
+          <RetryButton onRetry={() => leaderboardQuery.refetch()} colors={colors} />
+        </View>
+      )}
+
+      {!isLbLoading && currentLbEntries.length > 0 ? (
         <View style={[styles.leaderboardCard, { backgroundColor: colors.bgCard, borderColor: colors.border, ...cardShadow }]}>
           <View style={styles.lbHeaderRow}>
             <Text style={[styles.lbHeaderText, { color: colors.textMuted }]}>
@@ -454,7 +507,7 @@ export default function StatsScreen() {
             </Text>
             <Medal size={14} color={colors.gold} />
           </View>
-          {currentLbEntries.slice(0, 15).map((entry, idx) => (
+          {currentLbEntries.slice(0, 20).map((entry, idx) => (
             <LeaderboardRow
               key={`lb_${lbTab}_${idx}`}
               entry={entry}
@@ -464,11 +517,12 @@ export default function StatsScreen() {
             />
           ))}
         </View>
-      ) : (
+      ) : (!isLbLoading && !isLbError && (
         <View style={[styles.lbEmpty, { backgroundColor: colors.bgCard, borderColor: colors.border }]}>
           <Text style={[styles.lbEmptyText, { color: colors.textMuted }]}>No leaderboard data available</Text>
+          <RetryButton onRetry={() => leaderboardQuery.refetch()} colors={colors} />
         </View>
-      )}
+      ))}
 
       {lbTab === "combined" && recentCompleted.length > 0 && (
         <View style={[styles.recentCard, { backgroundColor: colors.bgCard, borderColor: colors.border, ...cardShadow }]}>
@@ -486,13 +540,6 @@ export default function StatsScreen() {
               </View>
             );
           })}
-        </View>
-      )}
-
-      {statsQuery.isLoading && (
-        <View style={styles.loadingWrap}>
-          <ActivityIndicator size="small" color={colors.accent} />
-          <Text style={[styles.loadingText, { color: colors.textMuted }]}>Loading stats...</Text>
         </View>
       )}
 
@@ -556,7 +603,7 @@ export default function StatsScreen() {
 
 const styles = StyleSheet.create({
   container: { flex: 1 },
-  content: { padding: 20, paddingBottom: 40 },
+  content: { padding: 20, paddingBottom: 140 },
   pageHeader: {
     flexDirection: "row", justifyContent: "space-between", alignItems: "flex-end",
     marginBottom: 22, paddingBottom: 12, borderBottomWidth: 1,
@@ -620,6 +667,10 @@ const styles = StyleSheet.create({
   recentTasks: { fontSize: 12, fontWeight: "600" as const },
   loadingWrap: { flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 8, paddingVertical: 20 },
   loadingText: { fontSize: 13 },
+  errorCard: {
+    flexDirection: "column", alignItems: "center", borderRadius: 12, padding: 16, marginBottom: 12, borderWidth: 1, gap: 6,
+  },
+  errorText: { fontSize: 13, fontWeight: "500" as const },
   allTimeCard: { borderRadius: 16, padding: 14, marginBottom: 10, borderWidth: 1 },
   allTimeGrid: { flexDirection: "row", alignItems: "center", marginBottom: 12 },
   allTimeItem: { flex: 1, alignItems: "center" },
