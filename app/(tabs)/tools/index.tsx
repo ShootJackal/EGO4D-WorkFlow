@@ -637,7 +637,7 @@ export default function ToolsScreen() {
     toggleTheme();
   }, [toggleTheme]);
 
-  const cardStyle = [styles.card, { backgroundColor: colors.bgCard, borderColor: colors.border, shadowColor: colors.shadow }] as const;
+  const cardStyle: any[] = [styles.card, { backgroundColor: colors.bgCard, borderColor: colors.border, shadowColor: colors.shadow }];
 
   return (
     <Animated.View style={[styles.flex, { opacity: fadeAnim }]}>
