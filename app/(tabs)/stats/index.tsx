@@ -17,6 +17,7 @@ import { Image } from "expo-image";
 import { useCollection } from "@/providers/CollectionProvider";
 import { useTheme } from "@/providers/ThemeProvider";
 import { fetchCollectorStats, fetchLeaderboard, buildLeaderboardFromCollectors } from "@/services/googleSheets";
+import { useLanguage } from "@/providers/LanguageProvider";
 import { CollectorStats, LeaderboardEntry } from "@/types";
 
 const FONT_MONO = Platform.select({ ios: "Courier New", android: "monospace", default: "monospace" });
@@ -222,6 +223,7 @@ const compStyles = StyleSheet.create({
 
 export default function StatsScreen() {
   const { colors } = useTheme();
+  const { t } = useLanguage();
   const insets = useSafeAreaInsets();
   const { selectedCollector, selectedCollectorName, selectedRig, todayLog, configured, collectors } = useCollection();
   const [refreshing, setRefreshing] = useState(false);
@@ -328,8 +330,8 @@ export default function StatsScreen() {
     return (
       <View style={[styles.empty, { backgroundColor: colors.bg, paddingTop: insets.top }]}>
         <Inbox size={44} color={colors.border} />
-        <Text style={[styles.emptyTitle, { color: colors.textPrimary }]}>No Collector Selected</Text>
-        <Text style={[styles.emptyText, { color: colors.textSecondary }]}>Set your profile in the Tools tab to view stats</Text>
+        <Text style={[styles.emptyTitle, { color: colors.textPrimary }]}>{t.stats.noCollector}</Text>
+        <Text style={[styles.emptyText, { color: colors.textSecondary }]}>{t.stats.noCollectorDesc}</Text>
       </View>
     );
   }
@@ -348,7 +350,7 @@ export default function StatsScreen() {
     >
       <View style={[styles.pageHeader, { borderBottomColor: colors.border }]}>
         <View>
-          <Text style={[styles.brandText, { color: colors.accent, fontFamily: FONT_MONO }]}>STATS</Text>
+          <Text style={[styles.brandText, { color: colors.accent, fontFamily: FONT_MONO }]}>{t.headers.stats}</Text>
           <Text style={[styles.brandSub, { color: colors.textMuted, fontFamily: FONT_MONO }]}>
             {normalizeCollectorName(selectedCollector.name)}
           </Text>
@@ -363,27 +365,27 @@ export default function StatsScreen() {
 
       <View style={styles.sectionHeader}>
         <Calendar size={12} color={colors.accent} />
-        <Text style={[styles.sectionLabel, { color: colors.accent }]}>TODAY</Text>
+        <Text style={[styles.sectionLabel, { color: colors.accent }]}>{t.stats.today}</Text>
       </View>
 
       <View style={styles.heroGrid}>
-        <HeroStat label="Assigned" value={String(localStats.total)} icon={<Target size={18} color={colors.accent} />} color={colors.accent} index={0} />
-        <HeroStat label="Completed" value={String(localStats.completed)} icon={<CheckCircle size={18} color={colors.complete} />} color={colors.complete} index={1} />
-        <HeroStat label="Uploaded" value={`${localStats.totalLogged.toFixed(1)}h`} icon={<Upload size={18} color={colors.statusPending} />} color={colors.statusPending} index={2} />
-        <HeroStat label="Active" value={String(localStats.active)} icon={<TrendingUp size={18} color={colors.accentLight} />} color={colors.accentLight} index={3} />
+        <HeroStat label={t.stats.assigned} value={String(localStats.total)} icon={<Target size={18} color={colors.accent} />} color={colors.accent} index={0} />
+        <HeroStat label={t.stats.completed} value={String(localStats.completed)} icon={<CheckCircle size={18} color={colors.complete} />} color={colors.complete} index={1} />
+        <HeroStat label={t.stats.uploaded} value={`${localStats.totalLogged.toFixed(1)}h`} icon={<Upload size={18} color={colors.statusPending} />} color={colors.statusPending} index={2} />
+        <HeroStat label={t.stats.active} value={String(localStats.active)} icon={<TrendingUp size={18} color={colors.accentLight} />} color={colors.accentLight} index={3} />
       </View>
 
       {isInitialLoad && (
         <View style={styles.loadingWrap}>
           <ActivityIndicator size="small" color={colors.accent} />
-          <Text style={[styles.loadingText, { color: colors.textMuted }]}>Loading stats...</Text>
+          <Text style={[styles.loadingText, { color: colors.textMuted }]}>{t.stats.loadingStats}</Text>
         </View>
       )}
 
       {isStatsError && !stats && (
         <View style={[styles.errorCard, { backgroundColor: colors.cancelBg, borderColor: colors.cancel + '25' }]}>
           <AlertCircle size={14} color={colors.cancel} />
-          <Text style={[styles.errorText, { color: colors.cancel }]}>Failed to load stats</Text>
+          <Text style={[styles.errorText, { color: colors.cancel }]}>{t.stats.failedStats}</Text>
           <RetryButton onRetry={() => statsQuery.refetch()} colors={colors} />
         </View>
       )}
@@ -392,7 +394,7 @@ export default function StatsScreen() {
         <>
           <View style={[styles.sectionHeader, { marginTop: 20 }]}>
             <Calendar size={12} color={colors.complete} />
-            <Text style={[styles.sectionLabel, { color: colors.complete }]}>THIS WEEK (MON-SUN)</Text>
+            <Text style={[styles.sectionLabel, { color: colors.complete }]}>{t.stats.thisWeek}</Text>
           </View>
           <View style={[styles.weekCard, { backgroundColor: colors.bgCard, borderColor: colors.border, ...cardShadow }]}>
             <View style={styles.weekRow}>
@@ -422,7 +424,7 @@ export default function StatsScreen() {
 
       <View style={[styles.sectionHeader, { marginTop: 24 }]}>
         <Trophy size={12} color={colors.gold} />
-        <Text style={[styles.sectionLabel, { color: colors.gold }]}>LEADERBOARD</Text>
+        <Text style={[styles.sectionLabel, { color: colors.gold }]}>{t.headers.leaderboard}</Text>
       </View>
 
       <View style={[styles.lbTabRow, { backgroundColor: colors.bgCard, borderColor: colors.border }]}>
@@ -487,14 +489,14 @@ export default function StatsScreen() {
       {isLbLoading && (
         <View style={styles.loadingWrap}>
           <ActivityIndicator size="small" color={colors.accent} />
-          <Text style={[styles.loadingText, { color: colors.textMuted }]}>Loading leaderboard...</Text>
+          <Text style={[styles.loadingText, { color: colors.textMuted }]}>{t.stats.loadingLeaderboard}</Text>
         </View>
       )}
 
       {isLbError && leaderboard.length === 0 && (
         <View style={[styles.errorCard, { backgroundColor: colors.cancelBg, borderColor: colors.cancel + '25' }]}>
           <AlertCircle size={14} color={colors.cancel} />
-          <Text style={[styles.errorText, { color: colors.cancel }]}>Failed to load leaderboard</Text>
+          <Text style={[styles.errorText, { color: colors.cancel }]}>{t.stats.failedLeaderboard}</Text>
           <RetryButton onRetry={() => leaderboardQuery.refetch()} colors={colors} />
         </View>
       )}
@@ -519,14 +521,14 @@ export default function StatsScreen() {
         </View>
       ) : (!isLbLoading && !isLbError && (
         <View style={[styles.lbEmpty, { backgroundColor: colors.bgCard, borderColor: colors.border }]}>
-          <Text style={[styles.lbEmptyText, { color: colors.textMuted }]}>No leaderboard data available</Text>
+          <Text style={[styles.lbEmptyText, { color: colors.textMuted }]}>{t.stats.noLeaderboard}</Text>
           <RetryButton onRetry={() => leaderboardQuery.refetch()} colors={colors} />
         </View>
       ))}
 
       {lbTab === "combined" && recentCompleted.length > 0 && (
         <View style={[styles.recentCard, { backgroundColor: colors.bgCard, borderColor: colors.border, ...cardShadow }]}>
-          <Text style={[styles.recentTitle, { color: colors.textMuted }]}>RECENT COMPLETIONS</Text>
+          <Text style={[styles.recentTitle, { color: colors.textMuted }]}>{t.stats.recentCompletions}</Text>
           {recentCompleted.map((item, idx) => {
             const regionColor = item.region === "MX" ? colors.mxOrange : colors.sfBlue;
             return (
@@ -547,7 +549,7 @@ export default function StatsScreen() {
         <>
           <View style={[styles.sectionHeader, { marginTop: 24 }]}>
             <TrendingUp size={12} color={colors.textMuted} />
-            <Text style={[styles.sectionLabelMuted, { color: colors.textMuted }]}>ALL TIME</Text>
+            <Text style={[styles.sectionLabelMuted, { color: colors.textMuted }]}>{t.stats.allTime}</Text>
           </View>
           <View style={[styles.allTimeCard, { backgroundColor: colors.bgCard, borderColor: colors.border, ...cardShadow }]}>
             <View style={styles.allTimeGrid}>
@@ -580,7 +582,7 @@ export default function StatsScreen() {
 
           {stats.topTasks && stats.topTasks.length > 0 && (
             <View style={[styles.topTasksCard, { backgroundColor: colors.bgCard, borderColor: colors.border, ...cardShadow }]}>
-              <Text style={[styles.topTasksTitle, { color: colors.textMuted }]}>Recent Tasks</Text>
+              <Text style={[styles.topTasksTitle, { color: colors.textMuted }]}>{t.stats.recentTasks}</Text>
               {stats.topTasks.slice(0, 8).map((task, idx) => {
                 const dotColor = task.status === "Completed" ? colors.statusActive : task.status === "Canceled" ? colors.statusCancelled : colors.accent;
                 return (

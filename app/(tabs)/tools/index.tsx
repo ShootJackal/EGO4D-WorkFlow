@@ -41,17 +41,20 @@ import {
   Lock,
   X,
   Star,
+  Globe,
 } from "lucide-react-native";
 import { Image } from "expo-image";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import * as Haptics from "expo-haptics";
 import { router } from "expo-router";
 import { useTheme } from "@/providers/ThemeProvider";
+import { useLanguage } from "@/providers/LanguageProvider";
 import { useCollection } from "@/providers/CollectionProvider";
 import { useQuery } from "@tanstack/react-query";
 import { fetchAdminDashboardData, fetchAdminCollectors, fetchTaskRequirements, clearAllCaches } from "@/services/googleSheets";
 import SelectPicker from "@/components/SelectPicker";
 import { AdminCollectorDetail, TaskRequirement } from "@/types";
+import { Language } from "@/constants/translations";
 
 const FONT_MONO = Platform.select({ ios: "Courier New", android: "monospace", default: "monospace" });
 const LOGO_URI = require("@/assets/images/taskflow-logo.png");
@@ -539,6 +542,7 @@ const pwStyles = StyleSheet.create({
 
 export default function ToolsScreen() {
   const { colors, isDark, toggleTheme } = useTheme();
+  const { t, language, setLanguage } = useLanguage();
   const insets = useSafeAreaInsets();
   const {
     collectors, selectedCollectorName, selectedCollector, selectedRig,
@@ -649,7 +653,7 @@ export default function ToolsScreen() {
         <View style={[styles.pageHeader, { borderBottomColor: colors.border }]}>
           <View>
             <View style={styles.brandRow}>
-              <Text style={[styles.brandText, { color: colors.accent, fontFamily: FONT_MONO }]}>TOOLS</Text>
+              <Text style={[styles.brandText, { color: colors.accent, fontFamily: FONT_MONO }]}>{t.headers.tools}</Text>
               {isAdmin && (
                 <View style={[styles.adminBadge, { backgroundColor: colors.gold + '18', borderColor: colors.gold + '40' }]}>
                   <Shield size={10} color={colors.gold} />
@@ -657,12 +661,12 @@ export default function ToolsScreen() {
                 </View>
               )}
             </View>
-            <Text style={[styles.brandSub, { color: colors.textMuted, fontFamily: FONT_MONO }]}>Settings & Utilities</Text>
+            <Text style={[styles.brandSub, { color: colors.textMuted, fontFamily: FONT_MONO }]}>{t.tools.settingsUtilities}</Text>
           </View>
           <Image source={LOGO_URI} style={styles.headerLogo} contentFit="contain" />
         </View>
 
-        <SectionHeader label="My Profile" icon={<User size={11} color={colors.textMuted} />} />
+        <SectionHeader label={t.tools.myProfile} icon={<User size={11} color={colors.textMuted} />} />
 
         <View style={cardStyle}>
           <View style={styles.settingRow}>
@@ -670,10 +674,10 @@ export default function ToolsScreen() {
               <User size={16} color={colors.accent} />
             </View>
             <View style={styles.settingContent}>
-              <Text style={[styles.settingLabel, { color: colors.textMuted }]}>Who are you?</Text>
+              <Text style={[styles.settingLabel, { color: colors.textMuted }]}>{t.tools.whoAreYou}</Text>
               <SelectPicker
                 label="" options={collectorOptions} selectedValue={selectedCollectorName}
-                onValueChange={handleSelectCollector} placeholder="Select your name..." testID="settings-collector-picker"
+                onValueChange={handleSelectCollector} placeholder={t.tools.selectName} testID="settings-collector-picker"
               />
             </View>
           </View>
@@ -686,14 +690,14 @@ export default function ToolsScreen() {
                   <Cpu size={16} color={colors.complete} />
                 </View>
                 <View style={styles.settingContent}>
-                  <Text style={[styles.settingLabel, { color: colors.textMuted }]}>Your Rig</Text>
+                  <Text style={[styles.settingLabel, { color: colors.textMuted }]}>{t.tools.yourRig}</Text>
                   {rigOptions.length > 0 ? (
                     <SelectPicker
                       label="" options={rigOptions} selectedValue={selectedRig}
-                      onValueChange={handleSelectRig} placeholder="Select your rig..." testID="rig-picker"
+                      onValueChange={handleSelectRig} placeholder={t.tools.selectRig} testID="rig-picker"
                     />
                   ) : (
-                    <Text style={[styles.noRigText, { color: colors.textMuted }]}>No rigs assigned</Text>
+                    <Text style={[styles.noRigText, { color: colors.textMuted }]}>{t.tools.noRigsAssigned}</Text>
                   )}
                 </View>
               </View>
@@ -722,7 +726,7 @@ export default function ToolsScreen() {
         )}
 
         <View style={styles.sectionGap} />
-        <SectionHeader label="Collection Timer" icon={<Timer size={11} color={colors.textMuted} />} />
+        <SectionHeader label={t.tools.collectionTimer} icon={<Timer size={11} color={colors.textMuted} />} />
         <CompactTimer />
 
         <View style={styles.sectionGap} />
@@ -738,17 +742,58 @@ export default function ToolsScreen() {
           </View>
           <View style={styles.themeContent}>
             <Text style={[styles.themeLabel, { color: colors.textPrimary }]}>
-              {isDark ? "Switch to Light Mode" : "Switch to Dark Mode"}
+              {isDark ? t.tools.switchToLight : t.tools.switchToDark}
             </Text>
             <Text style={[styles.themeSub, { color: colors.textMuted }]}>
-              {isDark ? "Easier on the eyes outdoors" : "Better for low-light collection"}
+              {isDark ? t.tools.lightDesc : t.tools.darkDesc}
             </Text>
           </View>
           <ChevronRight size={15} color={colors.textMuted} />
         </TouchableOpacity>
 
+        <View style={{ height: 10 }} />
+        <View style={[...cardStyle, styles.themeRow] as any}>
+          <View style={[styles.settingIconWrap, { backgroundColor: colors.accentSoft }]}>
+            <Globe size={16} color={colors.accent} />
+          </View>
+          <View style={styles.themeContent}>
+            <Text style={[styles.themeLabel, { color: colors.textPrimary }]}>{t.tools.language}</Text>
+            <Text style={[styles.themeSub, { color: colors.textMuted }]}>
+              {language === "en" ? "English" : "Español"}
+            </Text>
+          </View>
+          <View style={styles.langToggleRow}>
+            <TouchableOpacity
+              style={[styles.langBtn, {
+                backgroundColor: language === "en" ? colors.accentSoft : colors.bgInput,
+                borderColor: language === "en" ? colors.accent + '40' : 'transparent',
+              }]}
+              onPress={() => setLanguage("en" as Language)}
+              activeOpacity={0.7}
+            >
+              <Text style={[styles.langBtnText, {
+                color: language === "en" ? colors.accent : colors.textMuted,
+                fontWeight: language === "en" ? "700" as const : "400" as const,
+              }]}>EN</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[styles.langBtn, {
+                backgroundColor: language === "es" ? colors.accentSoft : colors.bgInput,
+                borderColor: language === "es" ? colors.accent + '40' : 'transparent',
+              }]}
+              onPress={() => setLanguage("es" as Language)}
+              activeOpacity={0.7}
+            >
+              <Text style={[styles.langBtnText, {
+                color: language === "es" ? colors.accent : colors.textMuted,
+                fontWeight: language === "es" ? "700" as const : "400" as const,
+              }]}>ES</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+
         <View style={styles.sectionGap} />
-        <SectionHeader label="Quick Actions" icon={<Zap size={11} color={colors.textMuted} />} />
+        <SectionHeader label={t.tools.quickActions} icon={<Zap size={11} color={colors.textMuted} />} />
 
         <View style={styles.quickGrid}>
           <QuickCard title="Slack" subtitle="Team chat" icon={<MessageSquare size={18} color={colors.slack} />} iconBg={colors.slackBg} onPress={openSlack} testID="slack-link" colors={colors} />
@@ -768,15 +813,15 @@ export default function ToolsScreen() {
             {clearingCache ? <ActivityIndicator size="small" color={colors.cancel} /> : <Trash2 size={16} color={colors.cancel} />}
           </View>
           <View style={styles.themeContent}>
-            <Text style={[styles.themeLabel, { color: colors.textPrimary }]}>Clear All Caches</Text>
-            <Text style={[styles.themeSub, { color: colors.textMuted }]}>Force refresh all data from server</Text>
+            <Text style={[styles.themeLabel, { color: colors.textPrimary }]}>{t.tools.clearCaches}</Text>
+            <Text style={[styles.themeSub, { color: colors.textMuted }]}>{t.tools.clearCachesDesc}</Text>
           </View>
         </TouchableOpacity>
 
         {configured && (
           <>
             <View style={styles.sectionGap} />
-            <SectionHeader label="Admin Dashboard" icon={<Shield size={11} color={colors.textMuted} />} />
+            <SectionHeader label={t.tools.adminDashboard} icon={<Shield size={11} color={colors.textMuted} />} />
             <AdminOverview colors={colors} />
           </>
         )}
@@ -792,7 +837,7 @@ export default function ToolsScreen() {
         {configured && (
           <>
             <View style={styles.sectionGap} />
-            <SectionHeader label="Data Viewer" icon={<Database size={11} color={colors.textMuted} />} />
+            <SectionHeader label={t.tools.dataViewer} icon={<Database size={11} color={colors.textMuted} />} />
             <View style={cardStyle}>
               {SHEET_PAGES.map((page, idx) => {
                 const IconComp = page.icon;
@@ -919,5 +964,10 @@ const styles = StyleSheet.create({
   sheetInfo: { flex: 1 },
   sheetRowText: { fontSize: 13, fontWeight: "500" as const },
   sheetDesc: { fontSize: 10, marginTop: 2 },
+  langToggleRow: { flexDirection: "row", gap: 6 },
+  langBtn: {
+    paddingHorizontal: 14, paddingVertical: 6, borderRadius: 8, borderWidth: 1,
+  },
+  langBtnText: { fontSize: 12, letterSpacing: 0.5, fontFamily: Platform.select({ ios: "Courier New", android: "monospace", default: "monospace" }) },
   bottomSpacer: { height: 20 },
 });

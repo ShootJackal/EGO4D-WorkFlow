@@ -1,6 +1,6 @@
 import { Tabs } from "expo-router";
 import { Send, Wrench, BarChart3, Radio } from "lucide-react-native";
-import React, { useRef, useCallback } from "react";
+import React, { useRef, useCallback, useMemo } from "react";
 import {
   View,
   Text,
@@ -11,35 +11,25 @@ import {
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useTheme } from "@/providers/ThemeProvider";
+import { useLanguage } from "@/providers/LanguageProvider";
 
 const { width: SCREEN_WIDTH } = Dimensions.get("window");
 
 const TAB_ORDER = ["index", "live", "stats", "tools"] as const;
 type TabName = (typeof TAB_ORDER)[number];
 
-const TAB_CONFIG: Record<TabName, { title: string; icon: (color: string, size: number) => React.ReactNode }> = {
-  index: {
-    title: "Collect",
-    icon: (color, size) => <Send size={size} color={color} />,
-  },
-  live: {
-    title: "LIVE",
-    icon: (color, size) => <Radio size={size} color={color} />,
-  },
-  stats: {
-    title: "Stats",
-    icon: (color, size) => <BarChart3 size={size} color={color} />,
-  },
-  tools: {
-    title: "Tools",
-    icon: (color, size) => <Wrench size={size} color={color} />,
-  },
-};
-
 function CustomTabBar({ state, navigation }: { state: any; navigation: any }) {
   const { colors, isDark } = useTheme();
+  const { t } = useLanguage();
   const insets = useSafeAreaInsets();
   const sliderAnim = useRef(new Animated.Value(0)).current;
+
+  const TAB_CONFIG = useMemo(() => ({
+    index: { title: t.tabs.collect, icon: (color: string, size: number) => <Send size={size} color={color} /> },
+    live: { title: t.tabs.live, icon: (color: string, size: number) => <Radio size={size} color={color} /> },
+    stats: { title: t.tabs.stats, icon: (color: string, size: number) => <BarChart3 size={size} color={color} /> },
+    tools: { title: t.tabs.tools, icon: (color: string, size: number) => <Wrench size={size} color={color} /> },
+  }), [t]);
 
   const TAB_COUNT = TAB_ORDER.length;
   const ISLAND_MARGIN = 20;
