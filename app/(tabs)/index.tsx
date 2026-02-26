@@ -29,6 +29,7 @@ import {
 import { Image } from "expo-image";
 import { useCollection } from "@/providers/CollectionProvider";
 import { useTheme } from "@/providers/ThemeProvider";
+import { useLanguage } from "@/providers/LanguageProvider";
 import SelectPicker from "@/components/SelectPicker";
 import ActionButton from "@/components/ActionButton";
 
@@ -95,6 +96,7 @@ const logStyles = StyleSheet.create({
 
 export default function DashboardScreen() {
   const { colors } = useTheme();
+  const { t } = useLanguage();
   const insets = useSafeAreaInsets();
   const {
     configured,
@@ -244,10 +246,10 @@ export default function DashboardScreen() {
           <View style={[styles.header, { borderBottomColor: colors.border }]}>
             <View style={styles.headerLeft}>
               <Text style={[styles.brandText, { color: colors.accent, fontFamily: FONT_MONO }]}>
-                COLLECT
+                {t.headers.collect}
               </Text>
               <Text style={[styles.brandSub, { color: colors.textMuted, fontFamily: FONT_MONO }]}>
-                {selectedCollector ? `${selectedCollector.name.split(" ")[0]}'s Workspace` : "Task Management"}
+                {selectedCollector ? `${selectedCollector.name.split(" ")[0]}${t.collect.workspace}` : t.collect.taskManagement}
               </Text>
             </View>
             <View style={styles.headerRight}>
@@ -262,7 +264,7 @@ export default function DashboardScreen() {
               {openTasks.length > 0 && (
                 <View style={[styles.openPill, { backgroundColor: colors.accentSoft, borderColor: colors.accentDim }]}>
                   <Circle size={6} color={colors.accent} fill={colors.accent} />
-                  <Text style={[styles.openPillText, { color: colors.accent }]}>{openTasks.length} open</Text>
+                  <Text style={[styles.openPillText, { color: colors.accent }]}>{openTasks.length} {t.common.open}</Text>
                 </View>
               )}
             </View>
@@ -296,7 +298,7 @@ export default function DashboardScreen() {
                   options={collectorOptions}
                   selectedValue={selectedCollectorName}
                   onValueChange={selectCollector}
-                  placeholder="Who are you? (set in Tools)"
+                  placeholder={t.tools.selectName}
                   testID="collector-picker"
                 />
                 <View style={[styles.separator, { backgroundColor: colors.border }]} />
@@ -305,7 +307,7 @@ export default function DashboardScreen() {
 
             <View style={styles.formField}>
               <View style={styles.fieldRow}>
-                <Text style={[styles.fieldLabel, { color: colors.textSecondary }]}>Task</Text>
+                <Text style={[styles.fieldLabel, { color: colors.textSecondary }]}>{t.common.task}</Text>
                 <View style={styles.fieldRowRight}>
                   {isLoadingTasks && <ActivityIndicator size="small" color={colors.accent} />}
                   <TouchableOpacity
@@ -351,7 +353,7 @@ export default function DashboardScreen() {
                 options={taskOptions}
                 selectedValue={selectedTaskName}
                 onValueChange={setSelectedTaskName}
-                placeholder={taskSearch ? `${taskOptions.length} tasks found...` : "Choose a task..."}
+                placeholder={taskSearch ? `${taskOptions.length} ${t.collect.tasksFound}` : t.collect.chooseTask}
                 testID="task-picker"
               />
             </View>
@@ -360,8 +362,8 @@ export default function DashboardScreen() {
 
             <View style={styles.formField}>
               <View style={styles.fieldRow}>
-                <Text style={[styles.fieldLabel, { color: colors.textSecondary }]}>Hours</Text>
-                <Text style={[styles.requiredTag, { color: colors.cancel }]}>required</Text>
+                <Text style={[styles.fieldLabel, { color: colors.textSecondary }]}>{t.common.hours}</Text>
+                <Text style={[styles.requiredTag, { color: colors.cancel }]}>{t.collect.hoursRequired}</Text>
               </View>
               <TextInput
                 style={[styles.input, {
@@ -371,7 +373,7 @@ export default function DashboardScreen() {
                 }]}
                 value={hoursToLog}
                 onChangeText={setHoursToLog}
-                placeholder="Enter hours (e.g. 1.5)"
+                placeholder={t.collect.enterHours}
                 placeholderTextColor={colors.textMuted}
                 keyboardType="decimal-pad"
                 testID="hours-input"
@@ -380,7 +382,7 @@ export default function DashboardScreen() {
                 <View style={styles.hintRow}>
                   <AlertCircle size={10} color={colors.statusPending} />
                   <Text style={[styles.hintText, { color: colors.statusPending }]}>
-                    You must enter your actual hours before submitting
+                    {t.collect.hoursHint}
                   </Text>
                 </View>
               )}
@@ -398,14 +400,14 @@ export default function DashboardScreen() {
 
             <View style={styles.formField}>
               <View style={styles.fieldRow}>
-                <Text style={[styles.fieldLabel, { color: colors.textSecondary }]}>Notes</Text>
-                <Text style={[styles.optionalTag, { color: colors.textMuted }]}>optional</Text>
+                <Text style={[styles.fieldLabel, { color: colors.textSecondary }]}>{t.common.notes}</Text>
+                <Text style={[styles.optionalTag, { color: colors.textMuted }]}>{t.collect.optional}</Text>
               </View>
               <TextInput
                 style={[styles.input, styles.notesInput, { backgroundColor: colors.bgInput, borderColor: colors.border, color: colors.textPrimary }]}
                 value={notes}
                 onChangeText={setNotes}
-                placeholder="Add notes..."
+                placeholder={t.collect.addNotes}
                 placeholderTextColor={colors.textMuted}
                 multiline
                 numberOfLines={3}
@@ -417,7 +419,7 @@ export default function DashboardScreen() {
 
           <View style={styles.actionsRow}>
             <ActionButton
-              title="Assign"
+              title={t.common.assign}
               icon={<UserCheck size={15} color={colors.assign} />}
               color={colors.assign}
               bgColor={colors.assignBg}
@@ -427,7 +429,7 @@ export default function DashboardScreen() {
               testID="assign-btn"
             />
             <ActionButton
-              title="Done"
+              title={t.common.done}
               icon={<CheckCircle size={15} color={colors.complete} />}
               color={colors.complete}
               bgColor={colors.completeBg}
@@ -437,7 +439,7 @@ export default function DashboardScreen() {
               testID="complete-btn"
             />
             <ActionButton
-              title="Cancel"
+              title={t.common.cancel}
               icon={<XCircle size={15} color={colors.cancel} />}
               color={colors.cancel}
               bgColor={colors.cancelBg}
@@ -450,7 +452,7 @@ export default function DashboardScreen() {
 
           {latestOpenTask !== null && notes.trim().length > 0 && (
             <ActionButton
-              title="Save Note Only"
+              title={t.collect.saveNoteOnly}
               icon={<StickyNote size={15} color={colors.accent} />}
               color={colors.accent}
               bgColor={colors.accentSoft}
@@ -467,7 +469,7 @@ export default function DashboardScreen() {
               <View style={styles.logHeader}>
                 <View style={styles.logHeaderLeft}>
                   <Clock size={12} color={colors.textMuted} />
-                  <Text style={[styles.logTitle, { color: colors.textMuted }]}>{"Today's Activity"}</Text>
+                  <Text style={[styles.logTitle, { color: colors.textMuted }]}>{t.collect.todayActivity}</Text>
                 </View>
                 <View style={styles.logStats}>
                   <Text style={[styles.logStatText, { color: colors.complete }]}>

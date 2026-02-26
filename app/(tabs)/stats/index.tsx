@@ -12,22 +12,19 @@ import {
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useQuery } from "@tanstack/react-query";
-import { TrendingUp, Clock, CheckCircle, Target, Inbox, Calendar, Trophy, Medal, Crown, Upload, ChevronDown } from "lucide-react-native";
+import { TrendingUp, Clock, CheckCircle, Target, Inbox, Calendar, Trophy, Medal, Crown, Upload, ChevronDown, RefreshCw, AlertCircle } from "lucide-react-native";
 import { Image } from "expo-image";
 import { useCollection } from "@/providers/CollectionProvider";
 import { useTheme } from "@/providers/ThemeProvider";
 import { fetchCollectorStats, fetchLeaderboard, buildLeaderboardFromCollectors } from "@/services/googleSheets";
+import { useLanguage } from "@/providers/LanguageProvider";
 import { CollectorStats, LeaderboardEntry } from "@/types";
 
 const FONT_MONO = Platform.select({ ios: "Courier New", android: "monospace", default: "monospace" });
-const SF_KNOWN_NAMES = new Set(["tony a", "veronika t", "travis b"]);
 const LOGO_URI = require("@/assets/images/taskflow-logo.png");
 
 function normalizeCollectorName(name: string): string {
   return name.replace(/\s*\(.*?\)\s*$/g, "").trim();
-}
-function normForMatch(name: string): string {
-  return normalizeCollectorName(name).toLowerCase().replace(/\.$/, "").trim();
 }
 
 type LeaderboardTab = "combined" | "sf" | "mx";
@@ -110,9 +107,11 @@ function LeaderboardRow({ entry, index, isCurrentUser, colors }: { entry: Leader
           <Text style={[lbStyles.name, { color: colors.textPrimary }]} numberOfLines={1}>
             {entry.collectorName}
           </Text>
-          <View style={[lbStyles.regionTag, { backgroundColor: regionColor + '14' }]}>
-            <Text style={[lbStyles.regionText, { color: regionColor }]}>{entry.region}</Text>
-          </View>
+          {entry.region ? (
+            <View style={[lbStyles.regionTag, { backgroundColor: regionColor + '14' }]}>
+              <Text style={[lbStyles.regionText, { color: regionColor }]}>{entry.region}</Text>
+            </View>
+          ) : null}
         </View>
         <View style={lbStyles.statsRow}>
           <Text style={[lbStyles.statVal, { color: colors.accent }]}>{entry.hoursLogged.toFixed(1)}h</Text>
@@ -139,6 +138,28 @@ const lbStyles = StyleSheet.create({
   statsRow: { flexDirection: "row", alignItems: "center", gap: 6, marginBottom: 6 },
   statVal: { fontSize: 11, fontWeight: "500" as const },
   statSep: { fontSize: 10 },
+});
+
+function RetryButton({ onRetry, colors }: { onRetry: () => void; colors: any }) {
+  return (
+    <TouchableOpacity
+      style={[retryStyles.btn, { backgroundColor: colors.accentSoft, borderColor: colors.accentDim }]}
+      onPress={onRetry}
+      activeOpacity={0.7}
+    >
+      <RefreshCw size={13} color={colors.accent} />
+      <Text style={[retryStyles.text, { color: colors.accent, fontFamily: FONT_MONO }]}>RETRY</Text>
+    </TouchableOpacity>
+  );
+}
+
+const retryStyles = StyleSheet.create({
+  btn: {
+    flexDirection: "row", alignItems: "center", justifyContent: "center",
+    gap: 6, paddingVertical: 10, paddingHorizontal: 20,
+    borderRadius: 10, borderWidth: 1, alignSelf: "center", marginTop: 12,
+  },
+  text: { fontSize: 11, fontWeight: "700" as const, letterSpacing: 1 },
 });
 
 function ComparisonCard({ mxHours, sfHours, mxCompleted, sfCompleted, colors }: {
@@ -202,6 +223,7 @@ const compStyles = StyleSheet.create({
 
 export default function StatsScreen() {
   const { colors } = useTheme();
+  const { t } = useLanguage();
   const insets = useSafeAreaInsets();
   const { selectedCollector, selectedCollectorName, selectedRig, todayLog, configured, collectors } = useCollection();
   const [refreshing, setRefreshing] = useState(false);
@@ -216,7 +238,7 @@ export default function StatsScreen() {
     queryFn: () => fetchCollectorStats(selectedCollectorName),
     enabled: configured && !!selectedCollectorName,
     staleTime: 60000,
-    retry: 1,
+    retry: 2,
   });
 
   const leaderboardQuery = useQuery<LeaderboardEntry[]>({
@@ -225,14 +247,13 @@ export default function StatsScreen() {
       const apiData = await fetchLeaderboard();
       if (apiData && apiData.length > 0) return apiData;
       if (collectors.length > 0) {
-        console.log("[Stats] Building leaderboard from collectors fallback");
         return buildLeaderboardFromCollectors(collectors);
       }
       return [];
     },
     enabled: configured && collectors.length > 0,
     staleTime: 120000,
-    retry: 1,
+    retry: 2,
   });
 
   const localStats = useMemo(() => {
@@ -253,9 +274,8 @@ export default function StatsScreen() {
     const sf: LeaderboardEntry[] = [];
     const mx: LeaderboardEntry[] = [];
     for (const e of leaderboard) {
-      const isSF = e.region === "SF" || SF_KNOWN_NAMES.has(normForMatch(e.collectorName));
-      if (isSF) sf.push({ ...e, region: "SF" });
-      else mx.push({ ...e, region: "MX" });
+      if (e.region === "SF") sf.push({ ...e });
+      else mx.push({ ...e, region: e.region || "MX" });
     }
     sf.sort((a, b) => b.hoursLogged - a.hoursLogged);
     mx.sort((a, b) => b.hoursLogged - a.hoursLogged);
@@ -283,7 +303,7 @@ export default function StatsScreen() {
       .map(e => ({
         name: e.collectorName,
         tasks: e.tasksCompleted,
-        region: e.region === "SF" || SF_KNOWN_NAMES.has(normForMatch(e.collectorName)) ? "SF" : "MX",
+        region: e.region || "MX",
       }));
   }, [leaderboard]);
 
@@ -310,11 +330,16 @@ export default function StatsScreen() {
     return (
       <View style={[styles.empty, { backgroundColor: colors.bg, paddingTop: insets.top }]}>
         <Inbox size={44} color={colors.border} />
-        <Text style={[styles.emptyTitle, { color: colors.textPrimary }]}>No Collector Selected</Text>
-        <Text style={[styles.emptyText, { color: colors.textSecondary }]}>Set your profile in the Tools tab to view stats</Text>
+        <Text style={[styles.emptyTitle, { color: colors.textPrimary }]}>{t.stats.noCollector}</Text>
+        <Text style={[styles.emptyText, { color: colors.textSecondary }]}>{t.stats.noCollectorDesc}</Text>
       </View>
     );
   }
+
+  const isInitialLoad = statsQuery.isLoading && !statsQuery.data;
+  const isStatsError = statsQuery.isError;
+  const isLbError = leaderboardQuery.isError;
+  const isLbLoading = leaderboardQuery.isLoading && !leaderboardQuery.data;
 
   return (
     <ScrollView
@@ -325,7 +350,7 @@ export default function StatsScreen() {
     >
       <View style={[styles.pageHeader, { borderBottomColor: colors.border }]}>
         <View>
-          <Text style={[styles.brandText, { color: colors.accent, fontFamily: FONT_MONO }]}>STATS</Text>
+          <Text style={[styles.brandText, { color: colors.accent, fontFamily: FONT_MONO }]}>{t.headers.stats}</Text>
           <Text style={[styles.brandSub, { color: colors.textMuted, fontFamily: FONT_MONO }]}>
             {normalizeCollectorName(selectedCollector.name)}
           </Text>
@@ -340,21 +365,36 @@ export default function StatsScreen() {
 
       <View style={styles.sectionHeader}>
         <Calendar size={12} color={colors.accent} />
-        <Text style={[styles.sectionLabel, { color: colors.accent }]}>TODAY</Text>
+        <Text style={[styles.sectionLabel, { color: colors.accent }]}>{t.stats.today}</Text>
       </View>
 
       <View style={styles.heroGrid}>
-        <HeroStat label="Assigned" value={String(localStats.total)} icon={<Target size={18} color={colors.accent} />} color={colors.accent} index={0} />
-        <HeroStat label="Completed" value={String(localStats.completed)} icon={<CheckCircle size={18} color={colors.complete} />} color={colors.complete} index={1} />
-        <HeroStat label="Uploaded" value={`${localStats.totalLogged.toFixed(1)}h`} icon={<Upload size={18} color={colors.statusPending} />} color={colors.statusPending} index={2} />
-        <HeroStat label="Active" value={String(localStats.active)} icon={<TrendingUp size={18} color={colors.accentLight} />} color={colors.accentLight} index={3} />
+        <HeroStat label={t.stats.assigned} value={String(localStats.total)} icon={<Target size={18} color={colors.accent} />} color={colors.accent} index={0} />
+        <HeroStat label={t.stats.completed} value={String(localStats.completed)} icon={<CheckCircle size={18} color={colors.complete} />} color={colors.complete} index={1} />
+        <HeroStat label={t.stats.uploaded} value={`${localStats.totalLogged.toFixed(1)}h`} icon={<Upload size={18} color={colors.statusPending} />} color={colors.statusPending} index={2} />
+        <HeroStat label={t.stats.active} value={String(localStats.active)} icon={<TrendingUp size={18} color={colors.accentLight} />} color={colors.accentLight} index={3} />
       </View>
+
+      {isInitialLoad && (
+        <View style={styles.loadingWrap}>
+          <ActivityIndicator size="small" color={colors.accent} />
+          <Text style={[styles.loadingText, { color: colors.textMuted }]}>{t.stats.loadingStats}</Text>
+        </View>
+      )}
+
+      {isStatsError && !stats && (
+        <View style={[styles.errorCard, { backgroundColor: colors.cancelBg, borderColor: colors.cancel + '25' }]}>
+          <AlertCircle size={14} color={colors.cancel} />
+          <Text style={[styles.errorText, { color: colors.cancel }]}>{t.stats.failedStats}</Text>
+          <RetryButton onRetry={() => statsQuery.refetch()} colors={colors} />
+        </View>
+      )}
 
       {stats && stats.weeklyLoggedHours > 0 && (
         <>
           <View style={[styles.sectionHeader, { marginTop: 20 }]}>
             <Calendar size={12} color={colors.complete} />
-            <Text style={[styles.sectionLabel, { color: colors.complete }]}>THIS WEEK (MON-SUN)</Text>
+            <Text style={[styles.sectionLabel, { color: colors.complete }]}>{t.stats.thisWeek}</Text>
           </View>
           <View style={[styles.weekCard, { backgroundColor: colors.bgCard, borderColor: colors.border, ...cardShadow }]}>
             <View style={styles.weekRow}>
@@ -384,7 +424,7 @@ export default function StatsScreen() {
 
       <View style={[styles.sectionHeader, { marginTop: 24 }]}>
         <Trophy size={12} color={colors.gold} />
-        <Text style={[styles.sectionLabel, { color: colors.gold }]}>LEADERBOARD</Text>
+        <Text style={[styles.sectionLabel, { color: colors.gold }]}>{t.headers.leaderboard}</Text>
       </View>
 
       <View style={[styles.lbTabRow, { backgroundColor: colors.bgCard, borderColor: colors.border }]}>
@@ -446,7 +486,22 @@ export default function StatsScreen() {
         />
       )}
 
-      {currentLbEntries.length > 0 ? (
+      {isLbLoading && (
+        <View style={styles.loadingWrap}>
+          <ActivityIndicator size="small" color={colors.accent} />
+          <Text style={[styles.loadingText, { color: colors.textMuted }]}>{t.stats.loadingLeaderboard}</Text>
+        </View>
+      )}
+
+      {isLbError && leaderboard.length === 0 && (
+        <View style={[styles.errorCard, { backgroundColor: colors.cancelBg, borderColor: colors.cancel + '25' }]}>
+          <AlertCircle size={14} color={colors.cancel} />
+          <Text style={[styles.errorText, { color: colors.cancel }]}>{t.stats.failedLeaderboard}</Text>
+          <RetryButton onRetry={() => leaderboardQuery.refetch()} colors={colors} />
+        </View>
+      )}
+
+      {!isLbLoading && currentLbEntries.length > 0 ? (
         <View style={[styles.leaderboardCard, { backgroundColor: colors.bgCard, borderColor: colors.border, ...cardShadow }]}>
           <View style={styles.lbHeaderRow}>
             <Text style={[styles.lbHeaderText, { color: colors.textMuted }]}>
@@ -454,7 +509,7 @@ export default function StatsScreen() {
             </Text>
             <Medal size={14} color={colors.gold} />
           </View>
-          {currentLbEntries.slice(0, 15).map((entry, idx) => (
+          {currentLbEntries.slice(0, 20).map((entry, idx) => (
             <LeaderboardRow
               key={`lb_${lbTab}_${idx}`}
               entry={entry}
@@ -464,15 +519,16 @@ export default function StatsScreen() {
             />
           ))}
         </View>
-      ) : (
+      ) : (!isLbLoading && !isLbError && (
         <View style={[styles.lbEmpty, { backgroundColor: colors.bgCard, borderColor: colors.border }]}>
-          <Text style={[styles.lbEmptyText, { color: colors.textMuted }]}>No leaderboard data available</Text>
+          <Text style={[styles.lbEmptyText, { color: colors.textMuted }]}>{t.stats.noLeaderboard}</Text>
+          <RetryButton onRetry={() => leaderboardQuery.refetch()} colors={colors} />
         </View>
-      )}
+      ))}
 
       {lbTab === "combined" && recentCompleted.length > 0 && (
         <View style={[styles.recentCard, { backgroundColor: colors.bgCard, borderColor: colors.border, ...cardShadow }]}>
-          <Text style={[styles.recentTitle, { color: colors.textMuted }]}>RECENT COMPLETIONS</Text>
+          <Text style={[styles.recentTitle, { color: colors.textMuted }]}>{t.stats.recentCompletions}</Text>
           {recentCompleted.map((item, idx) => {
             const regionColor = item.region === "MX" ? colors.mxOrange : colors.sfBlue;
             return (
@@ -489,18 +545,11 @@ export default function StatsScreen() {
         </View>
       )}
 
-      {statsQuery.isLoading && (
-        <View style={styles.loadingWrap}>
-          <ActivityIndicator size="small" color={colors.accent} />
-          <Text style={[styles.loadingText, { color: colors.textMuted }]}>Loading stats...</Text>
-        </View>
-      )}
-
       {stats && (
         <>
           <View style={[styles.sectionHeader, { marginTop: 24 }]}>
             <TrendingUp size={12} color={colors.textMuted} />
-            <Text style={[styles.sectionLabelMuted, { color: colors.textMuted }]}>ALL TIME</Text>
+            <Text style={[styles.sectionLabelMuted, { color: colors.textMuted }]}>{t.stats.allTime}</Text>
           </View>
           <View style={[styles.allTimeCard, { backgroundColor: colors.bgCard, borderColor: colors.border, ...cardShadow }]}>
             <View style={styles.allTimeGrid}>
@@ -533,7 +582,7 @@ export default function StatsScreen() {
 
           {stats.topTasks && stats.topTasks.length > 0 && (
             <View style={[styles.topTasksCard, { backgroundColor: colors.bgCard, borderColor: colors.border, ...cardShadow }]}>
-              <Text style={[styles.topTasksTitle, { color: colors.textMuted }]}>Recent Tasks</Text>
+              <Text style={[styles.topTasksTitle, { color: colors.textMuted }]}>{t.stats.recentTasks}</Text>
               {stats.topTasks.slice(0, 8).map((task, idx) => {
                 const dotColor = task.status === "Completed" ? colors.statusActive : task.status === "Canceled" ? colors.statusCancelled : colors.accent;
                 return (
@@ -556,7 +605,7 @@ export default function StatsScreen() {
 
 const styles = StyleSheet.create({
   container: { flex: 1 },
-  content: { padding: 20, paddingBottom: 40 },
+  content: { padding: 20, paddingBottom: 140 },
   pageHeader: {
     flexDirection: "row", justifyContent: "space-between", alignItems: "flex-end",
     marginBottom: 22, paddingBottom: 12, borderBottomWidth: 1,
@@ -620,6 +669,10 @@ const styles = StyleSheet.create({
   recentTasks: { fontSize: 12, fontWeight: "600" as const },
   loadingWrap: { flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 8, paddingVertical: 20 },
   loadingText: { fontSize: 13 },
+  errorCard: {
+    flexDirection: "column", alignItems: "center", borderRadius: 12, padding: 16, marginBottom: 12, borderWidth: 1, gap: 6,
+  },
+  errorText: { fontSize: 13, fontWeight: "500" as const },
   allTimeCard: { borderRadius: 16, padding: 14, marginBottom: 10, borderWidth: 1 },
   allTimeGrid: { flexDirection: "row", alignItems: "center", marginBottom: 12 },
   allTimeItem: { flex: 1, alignItems: "center" },
