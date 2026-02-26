@@ -1,0 +1,1964 @@
+diff --git a/AGENTS.md b/AGENTS.md
+new file mode 100644
+index 0000000..cd882d7
+--- /dev/null
++++ b/AGENTS.md
+@@ -0,0 +1,21 @@
++# AGENTS.md
++
++## Cursor Cloud specific instructions
++
++### Project overview
++
++TaskFlow is a React Native / Expo (SDK 54) cross-platform task management dashboard. It uses Bun as the package manager (`bun.lock`). The backend is a Google Apps Script endpoint (no self-hosted backend).
++
++### Running the app
++
++- **Web dev server**: `bunx expo start --web --port 8081` — starts Metro bundler and serves the app at `http://localhost:8081`
++- The `package.json` scripts (`bun run start`, `bun run start-web`) use the Rork CLI with `--tunnel`, which requires external network tunneling. For local development, use the direct Expo commands above instead.
++- **Lint**: `bun run lint` (runs `expo lint` with ESLint flat config)
++- **Web build**: `bunx expo export --platform web` outputs to `dist/`
++
++### Gotchas
++
++- The app's data comes from a Google Apps Script endpoint configured via `EXPO_PUBLIC_GOOGLE_SCRIPT_URL`. A default fallback URL is hardcoded in the source, so the app works without setting this env var (as long as the upstream endpoint is active).
++- There are no automated tests in this project (no test runner, no test files).
++- Expo may print version-compatibility warnings on startup; these are non-blocking.
++- Selecting a collector from the dropdown on the Collect tab may crash the web preview — this is a pre-existing app bug, not an environment issue.
+diff --git a/app/(tabs)/_layout.tsx b/app/(tabs)/_layout.tsx
+index 61c133c..a87064d 100644
+--- a/app/(tabs)/_layout.tsx
++++ b/app/(tabs)/_layout.tsx
+@@ -1,7 +1,7 @@
+ import { Tabs } from "expo-router";
+ import { LinearGradient } from "expo-linear-gradient";
+ import { Send, Wrench, BarChart3, Radio } from "lucide-react-native";
+-import React, { useRef, useCallback } from "react";
++import React, { useRef, useCallback, useMemo } from "react";
+ import {
+   View,
+   Text,
+@@ -12,36 +12,26 @@ import {
+ } from "react-native";
+ import { useSafeAreaInsets } from "react-native-safe-area-context";
+ import { useTheme } from "@/providers/ThemeProvider";
++import { useLanguage } from "@/providers/LanguageProvider";
+ 
+ const { width: SCREEN_WIDTH } = Dimensions.get("window");
+ 
+ const TAB_ORDER = ["live", "index", "stats", "tools"] as const;
+ type TabName = (typeof TAB_ORDER)[number];
+ 
+-const TAB_CONFIG: Record<TabName, { title: string; icon: (color: string, size: number) => React.ReactNode }> = {
+-  index: {
+-    title: "Collect",
+-    icon: (color, size) => <Send size={size} color={color} />,
+-  },
+-  live: {
+-    title: "LIVE",
+-    icon: (color, size) => <Radio size={size} color={color} />,
+-  },
+-  stats: {
+-    title: "Stats",
+-    icon: (color, size) => <BarChart3 size={size} color={color} />,
+-  },
+-  tools: {
+-    title: "Tools",
+-    icon: (color, size) => <Wrench size={size} color={color} />,
+-  },
+-};
+-
+ function CustomTabBar({ state, navigation }: { state: any; navigation: any }) {
+   const { colors, isDark } = useTheme();
++  const { t } = useLanguage();
+   const insets = useSafeAreaInsets();
+   const sliderAnim = useRef(new Animated.Value(0)).current;
+ 
++  const TAB_CONFIG = useMemo(() => ({
++    index: { title: t.tabs.collect, icon: (color: string, size: number) => <Send size={size} color={color} /> },
++    live: { title: t.tabs.live, icon: (color: string, size: number) => <Radio size={size} color={color} /> },
++    stats: { title: t.tabs.stats, icon: (color: string, size: number) => <BarChart3 size={size} color={color} /> },
++    tools: { title: t.tabs.tools, icon: (color: string, size: number) => <Wrench size={size} color={color} /> },
++  }), [t]);
++
+   const TAB_COUNT = TAB_ORDER.length;
+   const ISLAND_MARGIN = 20;
+   const ISLAND_WIDTH = SCREEN_WIDTH - ISLAND_MARGIN * 2;
+diff --git a/app/(tabs)/index.tsx b/app/(tabs)/index.tsx
+index 7aacead..37af273 100644
+--- a/app/(tabs)/index.tsx
++++ b/app/(tabs)/index.tsx
+@@ -29,6 +29,7 @@ import {
+ import { Image } from "expo-image";
+ import { useCollection } from "@/providers/CollectionProvider";
+ import { useTheme } from "@/providers/ThemeProvider";
++import { useLanguage } from "@/providers/LanguageProvider";
+ import SelectPicker from "@/components/SelectPicker";
+ import ActionButton from "@/components/ActionButton";
+ 
+@@ -95,6 +96,7 @@ const logStyles = StyleSheet.create({
+ 
+ export default function DashboardScreen() {
+   const { colors } = useTheme();
++  const { t } = useLanguage();
+   const insets = useSafeAreaInsets();
+   const {
+     configured,
+@@ -254,10 +256,10 @@ export default function DashboardScreen() {
+           >
+             <View style={styles.headerLeft}>
+               <Text style={[styles.brandText, { color: colors.accent, fontFamily: FONT_MONO }]}>
+-                COLLECT
++                {t.headers.collect}
+               </Text>
+               <Text style={[styles.brandSub, { color: colors.textMuted, fontFamily: FONT_MONO }]}>
+-                {selectedCollector ? `${selectedCollector.name.split(" ")[0]}'s Workspace` : "Task Management"}
++                {selectedCollector ? `${selectedCollector.name.split(" ")[0]}${t.collect.workspace}` : t.collect.taskManagement}
+               </Text>
+             </View>
+             <View style={styles.headerRight}>
+@@ -272,7 +274,7 @@ export default function DashboardScreen() {
+               {openTasks.length > 0 && (
+                 <View style={[styles.openPill, { backgroundColor: colors.accentSoft, borderColor: colors.accentDim }]}>
+                   <Circle size={6} color={colors.accent} fill={colors.accent} />
+-                  <Text style={[styles.openPillText, { color: colors.accent }]}>{openTasks.length} open</Text>
++                  <Text style={[styles.openPillText, { color: colors.accent }]}>{openTasks.length} {t.common.open}</Text>
+                 </View>
+               )}
+             </View>
+@@ -306,7 +308,7 @@ export default function DashboardScreen() {
+                   options={collectorOptions}
+                   selectedValue={selectedCollectorName}
+                   onValueChange={selectCollector}
+-                  placeholder="Who are you? (set in Tools)"
++                  placeholder={t.tools.selectName}
+                   testID="collector-picker"
+                 />
+                 <View style={[styles.separator, { backgroundColor: colors.border }]} />
+@@ -315,7 +317,7 @@ export default function DashboardScreen() {
+ 
+             <View style={styles.formField}>
+               <View style={styles.fieldRow}>
+-                <Text style={[styles.fieldLabel, { color: colors.textSecondary }]}>Task</Text>
++                <Text style={[styles.fieldLabel, { color: colors.textSecondary }]}>{t.common.task}</Text>
+                 <View style={styles.fieldRowRight}>
+                   {isLoadingTasks && <ActivityIndicator size="small" color={colors.accent} />}
+                   <TouchableOpacity
+@@ -361,7 +363,7 @@ export default function DashboardScreen() {
+                 options={taskOptions}
+                 selectedValue={selectedTaskName}
+                 onValueChange={setSelectedTaskName}
+-                placeholder={taskSearch ? `${taskOptions.length} tasks found...` : "Choose a task..."}
++                placeholder={taskSearch ? `${taskOptions.length} ${t.collect.tasksFound}` : t.collect.chooseTask}
+                 testID="task-picker"
+               />
+             </View>
+@@ -370,8 +372,8 @@ export default function DashboardScreen() {
+ 
+             <View style={styles.formField}>
+               <View style={styles.fieldRow}>
+-                <Text style={[styles.fieldLabel, { color: colors.textSecondary }]}>Hours</Text>
+-                <Text style={[styles.requiredTag, { color: colors.cancel }]}>required</Text>
++                <Text style={[styles.fieldLabel, { color: colors.textSecondary }]}>{t.common.hours}</Text>
++                <Text style={[styles.requiredTag, { color: colors.cancel }]}>{t.collect.hoursRequired}</Text>
+               </View>
+               <TextInput
+                 style={[styles.input, {
+@@ -381,7 +383,7 @@ export default function DashboardScreen() {
+                 }]}
+                 value={hoursToLog}
+                 onChangeText={setHoursToLog}
+-                placeholder="Enter hours (e.g. 1.5)"
++                placeholder={t.collect.enterHours}
+                 placeholderTextColor={colors.textMuted}
+                 keyboardType="decimal-pad"
+                 testID="hours-input"
+@@ -390,7 +392,7 @@ export default function DashboardScreen() {
+                 <View style={styles.hintRow}>
+                   <AlertCircle size={10} color={colors.statusPending} />
+                   <Text style={[styles.hintText, { color: colors.statusPending }]}>
+-                    You must enter your actual hours before submitting
++                    {t.collect.hoursHint}
+                   </Text>
+                 </View>
+               )}
+@@ -408,14 +410,14 @@ export default function DashboardScreen() {
+ 
+             <View style={styles.formField}>
+               <View style={styles.fieldRow}>
+-                <Text style={[styles.fieldLabel, { color: colors.textSecondary }]}>Notes</Text>
+-                <Text style={[styles.optionalTag, { color: colors.textMuted }]}>optional</Text>
++                <Text style={[styles.fieldLabel, { color: colors.textSecondary }]}>{t.common.notes}</Text>
++                <Text style={[styles.optionalTag, { color: colors.textMuted }]}>{t.collect.optional}</Text>
+               </View>
+               <TextInput
+                 style={[styles.input, styles.notesInput, { backgroundColor: colors.bgInput, borderColor: colors.border, color: colors.textPrimary }]}
+                 value={notes}
+                 onChangeText={setNotes}
+-                placeholder="Add notes..."
++                placeholder={t.collect.addNotes}
+                 placeholderTextColor={colors.textMuted}
+                 multiline
+                 numberOfLines={3}
+@@ -427,7 +429,7 @@ export default function DashboardScreen() {
+ 
+           <View style={styles.actionsRow}>
+             <ActionButton
+-              title="Assign"
++              title={t.common.assign}
+               icon={<UserCheck size={15} color={colors.assign} />}
+               color={colors.assign}
+               bgColor={colors.assignBg}
+@@ -437,7 +439,7 @@ export default function DashboardScreen() {
+               testID="assign-btn"
+             />
+             <ActionButton
+-              title="Done"
++              title={t.common.done}
+               icon={<CheckCircle size={15} color={colors.complete} />}
+               color={colors.complete}
+               bgColor={colors.completeBg}
+@@ -447,7 +449,7 @@ export default function DashboardScreen() {
+               testID="complete-btn"
+             />
+             <ActionButton
+-              title="Cancel"
++              title={t.common.cancel}
+               icon={<XCircle size={15} color={colors.cancel} />}
+               color={colors.cancel}
+               bgColor={colors.cancelBg}
+@@ -460,7 +462,7 @@ export default function DashboardScreen() {
+ 
+           {latestOpenTask !== null && notes.trim().length > 0 && (
+             <ActionButton
+-              title="Save Note Only"
++              title={t.collect.saveNoteOnly}
+               icon={<StickyNote size={15} color={colors.accent} />}
+               color={colors.accent}
+               bgColor={colors.accentSoft}
+@@ -477,7 +479,7 @@ export default function DashboardScreen() {
+               <View style={styles.logHeader}>
+                 <View style={styles.logHeaderLeft}>
+                   <Clock size={12} color={colors.textMuted} />
+-                  <Text style={[styles.logTitle, { color: colors.textMuted }]}>{"Today's Activity"}</Text>
++                  <Text style={[styles.logTitle, { color: colors.textMuted }]}>{t.collect.todayActivity}</Text>
+                 </View>
+                 <View style={styles.logStats}>
+                   <Text style={[styles.logStatText, { color: colors.complete }]}>
+diff --git a/app/(tabs)/stats/index.tsx b/app/(tabs)/stats/index.tsx
+index 76e99c3..0994727 100644
+--- a/app/(tabs)/stats/index.tsx
++++ b/app/(tabs)/stats/index.tsx
+@@ -12,23 +12,20 @@ import {
+ } from "react-native";
+ import { useSafeAreaInsets } from "react-native-safe-area-context";
+ import { useQuery } from "@tanstack/react-query";
+-import { TrendingUp, Clock, CheckCircle, Target, Inbox, Calendar, Trophy, Medal, Crown, Upload, ChevronDown } from "lucide-react-native";
++import { TrendingUp, Clock, CheckCircle, Target, Inbox, Calendar, Trophy, Medal, Crown, Upload, ChevronDown, RefreshCw, AlertCircle } from "lucide-react-native";
+ import { Image } from "expo-image";
+ import { useCollection } from "@/providers/CollectionProvider";
+ import { useTheme } from "@/providers/ThemeProvider";
+ import { fetchCollectorStats, fetchLeaderboard, buildLeaderboardFromCollectors } from "@/services/googleSheets";
++import { useLanguage } from "@/providers/LanguageProvider";
+ import { CollectorStats, LeaderboardEntry } from "@/types";
+ 
+ const FONT_MONO = Platform.select({ ios: "Courier New", android: "monospace", default: "monospace" });
+-const SF_KNOWN_NAMES = new Set(["tony a", "veronika t", "travis b"]);
+ const LOGO_URI = require("@/assets/images/taskflow-logo.png");
+ 
+ function normalizeCollectorName(name: string): string {
+   return name.replace(/\s*\(.*?\)\s*$/g, "").trim();
+ }
+-function normForMatch(name: string): string {
+-  return normalizeCollectorName(name).toLowerCase().replace(/\.$/, "").trim();
+-}
+ 
+ type LeaderboardTab = "combined" | "sf" | "mx";
+ 
+@@ -110,9 +107,11 @@ function LeaderboardRow({ entry, index, isCurrentUser, colors }: { entry: Leader
+           <Text style={[lbStyles.name, { color: colors.textPrimary }]} numberOfLines={1}>
+             {entry.collectorName}
+           </Text>
+-          <View style={[lbStyles.regionTag, { backgroundColor: regionColor + '14' }]}>
+-            <Text style={[lbStyles.regionText, { color: regionColor }]}>{entry.region}</Text>
+-          </View>
++          {entry.region ? (
++            <View style={[lbStyles.regionTag, { backgroundColor: regionColor + '14' }]}>
++              <Text style={[lbStyles.regionText, { color: regionColor }]}>{entry.region}</Text>
++            </View>
++          ) : null}
+         </View>
+         <View style={lbStyles.statsRow}>
+           <Text style={[lbStyles.statVal, { color: colors.accent }]}>{entry.hoursLogged.toFixed(1)}h</Text>
+@@ -141,6 +140,28 @@ const lbStyles = StyleSheet.create({
+   statSep: { fontSize: 10 },
+ });
+ 
++function RetryButton({ onRetry, colors }: { onRetry: () => void; colors: any }) {
++  return (
++    <TouchableOpacity
++      style={[retryStyles.btn, { backgroundColor: colors.accentSoft, borderColor: colors.accentDim }]}
++      onPress={onRetry}
++      activeOpacity={0.7}
++    >
++      <RefreshCw size={13} color={colors.accent} />
++      <Text style={[retryStyles.text, { color: colors.accent, fontFamily: FONT_MONO }]}>RETRY</Text>
++    </TouchableOpacity>
++  );
++}
++
++const retryStyles = StyleSheet.create({
++  btn: {
++    flexDirection: "row", alignItems: "center", justifyContent: "center",
++    gap: 6, paddingVertical: 10, paddingHorizontal: 20,
++    borderRadius: 10, borderWidth: 1, alignSelf: "center", marginTop: 12,
++  },
++  text: { fontSize: 11, fontWeight: "700" as const, letterSpacing: 1 },
++});
++
+ function ComparisonCard({ mxHours, sfHours, mxCompleted, sfCompleted, colors }: {
+   mxHours: number; sfHours: number; mxCompleted: number; sfCompleted: number; colors: any;
+ }) {
+@@ -202,6 +223,7 @@ const compStyles = StyleSheet.create({
+ 
+ export default function StatsScreen() {
+   const { colors } = useTheme();
++  const { t } = useLanguage();
+   const insets = useSafeAreaInsets();
+   const { selectedCollector, selectedCollectorName, selectedRig, todayLog, configured, collectors } = useCollection();
+   const [refreshing, setRefreshing] = useState(false);
+@@ -216,7 +238,7 @@ export default function StatsScreen() {
+     queryFn: () => fetchCollectorStats(selectedCollectorName),
+     enabled: configured && !!selectedCollectorName,
+     staleTime: 60000,
+-    retry: 1,
++    retry: 2,
+   });
+ 
+   const leaderboardQuery = useQuery<LeaderboardEntry[]>({
+@@ -225,14 +247,13 @@ export default function StatsScreen() {
+       const apiData = await fetchLeaderboard();
+       if (apiData && apiData.length > 0) return apiData;
+       if (collectors.length > 0) {
+-        console.log("[Stats] Building leaderboard from collectors fallback");
+         return buildLeaderboardFromCollectors(collectors);
+       }
+       return [];
+     },
+     enabled: configured && collectors.length > 0,
+     staleTime: 120000,
+-    retry: 1,
++    retry: 2,
+   });
+ 
+   const localStats = useMemo(() => {
+@@ -253,9 +274,8 @@ export default function StatsScreen() {
+     const sf: LeaderboardEntry[] = [];
+     const mx: LeaderboardEntry[] = [];
+     for (const e of leaderboard) {
+-      const isSF = e.region === "SF" || SF_KNOWN_NAMES.has(normForMatch(e.collectorName));
+-      if (isSF) sf.push({ ...e, region: "SF" });
+-      else mx.push({ ...e, region: "MX" });
++      if (e.region === "SF") sf.push({ ...e });
++      else mx.push({ ...e, region: e.region || "MX" });
+     }
+     sf.sort((a, b) => b.hoursLogged - a.hoursLogged);
+     mx.sort((a, b) => b.hoursLogged - a.hoursLogged);
+@@ -283,7 +303,7 @@ export default function StatsScreen() {
+       .map(e => ({
+         name: e.collectorName,
+         tasks: e.tasksCompleted,
+-        region: e.region === "SF" || SF_KNOWN_NAMES.has(normForMatch(e.collectorName)) ? "SF" : "MX",
++        region: e.region || "MX",
+       }));
+   }, [leaderboard]);
+ 
+@@ -310,12 +330,17 @@ export default function StatsScreen() {
+     return (
+       <View style={[styles.empty, { backgroundColor: colors.bg, paddingTop: insets.top }]}>
+         <Inbox size={44} color={colors.border} />
+-        <Text style={[styles.emptyTitle, { color: colors.textPrimary }]}>No Collector Selected</Text>
+-        <Text style={[styles.emptyText, { color: colors.textSecondary }]}>Set your profile in the Tools tab to view stats</Text>
++        <Text style={[styles.emptyTitle, { color: colors.textPrimary }]}>{t.stats.noCollector}</Text>
++        <Text style={[styles.emptyText, { color: colors.textSecondary }]}>{t.stats.noCollectorDesc}</Text>
+       </View>
+     );
+   }
+ 
++  const isInitialLoad = statsQuery.isLoading && !statsQuery.data;
++  const isStatsError = statsQuery.isError;
++  const isLbError = leaderboardQuery.isError;
++  const isLbLoading = leaderboardQuery.isLoading && !leaderboardQuery.data;
++
+   return (
+     <ScrollView
+       style={[styles.container, { backgroundColor: colors.bg, paddingTop: insets.top }]}
+@@ -335,7 +360,7 @@ export default function StatsScreen() {
+         ]}
+       >
+         <View>
+-          <Text style={[styles.brandText, { color: colors.accent, fontFamily: FONT_MONO }]}>STATS</Text>
++          <Text style={[styles.brandText, { color: colors.accent, fontFamily: FONT_MONO }]}>{t.headers.stats}</Text>
+           <Text style={[styles.brandSub, { color: colors.textMuted, fontFamily: FONT_MONO }]}>
+             {normalizeCollectorName(selectedCollector.name)}
+           </Text>
+@@ -350,21 +375,36 @@ export default function StatsScreen() {
+ 
+       <View style={styles.sectionHeader}>
+         <Calendar size={12} color={colors.accent} />
+-        <Text style={[styles.sectionLabel, { color: colors.accent }]}>TODAY</Text>
++        <Text style={[styles.sectionLabel, { color: colors.accent }]}>{t.stats.today}</Text>
+       </View>
+ 
+       <View style={styles.heroGrid}>
+-        <HeroStat label="Assigned" value={String(localStats.total)} icon={<Target size={18} color={colors.accent} />} color={colors.accent} index={0} />
+-        <HeroStat label="Completed" value={String(localStats.completed)} icon={<CheckCircle size={18} color={colors.complete} />} color={colors.complete} index={1} />
+-        <HeroStat label="Uploaded" value={`${localStats.totalLogged.toFixed(1)}h`} icon={<Upload size={18} color={colors.statusPending} />} color={colors.statusPending} index={2} />
+-        <HeroStat label="Active" value={String(localStats.active)} icon={<TrendingUp size={18} color={colors.accentLight} />} color={colors.accentLight} index={3} />
++        <HeroStat label={t.stats.assigned} value={String(localStats.total)} icon={<Target size={18} color={colors.accent} />} color={colors.accent} index={0} />
++        <HeroStat label={t.stats.completed} value={String(localStats.completed)} icon={<CheckCircle size={18} color={colors.complete} />} color={colors.complete} index={1} />
++        <HeroStat label={t.stats.uploaded} value={`${localStats.totalLogged.toFixed(1)}h`} icon={<Upload size={18} color={colors.statusPending} />} color={colors.statusPending} index={2} />
++        <HeroStat label={t.stats.active} value={String(localStats.active)} icon={<TrendingUp size={18} color={colors.accentLight} />} color={colors.accentLight} index={3} />
+       </View>
+ 
++      {isInitialLoad && (
++        <View style={styles.loadingWrap}>
++          <ActivityIndicator size="small" color={colors.accent} />
++          <Text style={[styles.loadingText, { color: colors.textMuted }]}>{t.stats.loadingStats}</Text>
++        </View>
++      )}
++
++      {isStatsError && !stats && (
++        <View style={[styles.errorCard, { backgroundColor: colors.cancelBg, borderColor: colors.cancel + '25' }]}>
++          <AlertCircle size={14} color={colors.cancel} />
++          <Text style={[styles.errorText, { color: colors.cancel }]}>{t.stats.failedStats}</Text>
++          <RetryButton onRetry={() => statsQuery.refetch()} colors={colors} />
++        </View>
++      )}
++
+       {stats && stats.weeklyLoggedHours > 0 && (
+         <>
+           <View style={[styles.sectionHeader, { marginTop: 20 }]}>
+             <Calendar size={12} color={colors.complete} />
+-            <Text style={[styles.sectionLabel, { color: colors.complete }]}>THIS WEEK (MON-SUN)</Text>
++            <Text style={[styles.sectionLabel, { color: colors.complete }]}>{t.stats.thisWeek}</Text>
+           </View>
+           <View style={[styles.weekCard, { backgroundColor: colors.bgCard, borderColor: colors.border, ...cardShadow }]}>
+             <View style={styles.weekRow}>
+@@ -394,7 +434,7 @@ export default function StatsScreen() {
+ 
+       <View style={[styles.sectionHeader, { marginTop: 24 }]}>
+         <Trophy size={12} color={colors.gold} />
+-        <Text style={[styles.sectionLabel, { color: colors.gold }]}>LEADERBOARD</Text>
++        <Text style={[styles.sectionLabel, { color: colors.gold }]}>{t.headers.leaderboard}</Text>
+       </View>
+ 
+       <View style={[styles.lbTabRow, { backgroundColor: colors.bgCard, borderColor: colors.border }]}>
+@@ -456,7 +496,22 @@ export default function StatsScreen() {
+         />
+       )}
+ 
+-      {currentLbEntries.length > 0 ? (
++      {isLbLoading && (
++        <View style={styles.loadingWrap}>
++          <ActivityIndicator size="small" color={colors.accent} />
++          <Text style={[styles.loadingText, { color: colors.textMuted }]}>{t.stats.loadingLeaderboard}</Text>
++        </View>
++      )}
++
++      {isLbError && leaderboard.length === 0 && (
++        <View style={[styles.errorCard, { backgroundColor: colors.cancelBg, borderColor: colors.cancel + '25' }]}>
++          <AlertCircle size={14} color={colors.cancel} />
++          <Text style={[styles.errorText, { color: colors.cancel }]}>{t.stats.failedLeaderboard}</Text>
++          <RetryButton onRetry={() => leaderboardQuery.refetch()} colors={colors} />
++        </View>
++      )}
++
++      {!isLbLoading && currentLbEntries.length > 0 ? (
+         <View style={[styles.leaderboardCard, { backgroundColor: colors.bgCard, borderColor: colors.border, ...cardShadow }]}>
+           <View style={styles.lbHeaderRow}>
+             <Text style={[styles.lbHeaderText, { color: colors.textMuted }]}>
+@@ -464,7 +519,7 @@ export default function StatsScreen() {
+             </Text>
+             <Medal size={14} color={colors.gold} />
+           </View>
+-          {currentLbEntries.slice(0, 15).map((entry, idx) => (
++          {currentLbEntries.slice(0, 20).map((entry, idx) => (
+             <LeaderboardRow
+               key={`lb_${lbTab}_${idx}`}
+               entry={entry}
+@@ -474,15 +529,16 @@ export default function StatsScreen() {
+             />
+           ))}
+         </View>
+-      ) : (
++      ) : (!isLbLoading && !isLbError && (
+         <View style={[styles.lbEmpty, { backgroundColor: colors.bgCard, borderColor: colors.border }]}>
+-          <Text style={[styles.lbEmptyText, { color: colors.textMuted }]}>No leaderboard data available</Text>
++          <Text style={[styles.lbEmptyText, { color: colors.textMuted }]}>{t.stats.noLeaderboard}</Text>
++          <RetryButton onRetry={() => leaderboardQuery.refetch()} colors={colors} />
+         </View>
+-      )}
++      ))}
+ 
+       {lbTab === "combined" && recentCompleted.length > 0 && (
+         <View style={[styles.recentCard, { backgroundColor: colors.bgCard, borderColor: colors.border, ...cardShadow }]}>
+-          <Text style={[styles.recentTitle, { color: colors.textMuted }]}>RECENT COMPLETIONS</Text>
++          <Text style={[styles.recentTitle, { color: colors.textMuted }]}>{t.stats.recentCompletions}</Text>
+           {recentCompleted.map((item, idx) => {
+             const regionColor = item.region === "MX" ? colors.mxOrange : colors.sfBlue;
+             return (
+@@ -499,18 +555,11 @@ export default function StatsScreen() {
+         </View>
+       )}
+ 
+-      {statsQuery.isLoading && (
+-        <View style={styles.loadingWrap}>
+-          <ActivityIndicator size="small" color={colors.accent} />
+-          <Text style={[styles.loadingText, { color: colors.textMuted }]}>Loading stats...</Text>
+-        </View>
+-      )}
+-
+       {stats && (
+         <>
+           <View style={[styles.sectionHeader, { marginTop: 24 }]}>
+             <TrendingUp size={12} color={colors.textMuted} />
+-            <Text style={[styles.sectionLabelMuted, { color: colors.textMuted }]}>ALL TIME</Text>
++            <Text style={[styles.sectionLabelMuted, { color: colors.textMuted }]}>{t.stats.allTime}</Text>
+           </View>
+           <View style={[styles.allTimeCard, { backgroundColor: colors.bgCard, borderColor: colors.border, ...cardShadow }]}>
+             <View style={styles.allTimeGrid}>
+@@ -543,7 +592,7 @@ export default function StatsScreen() {
+ 
+           {stats.topTasks && stats.topTasks.length > 0 && (
+             <View style={[styles.topTasksCard, { backgroundColor: colors.bgCard, borderColor: colors.border, ...cardShadow }]}>
+-              <Text style={[styles.topTasksTitle, { color: colors.textMuted }]}>Recent Tasks</Text>
++              <Text style={[styles.topTasksTitle, { color: colors.textMuted }]}>{t.stats.recentTasks}</Text>
+               {stats.topTasks.slice(0, 8).map((task, idx) => {
+                 const dotColor = task.status === "Completed" ? colors.statusActive : task.status === "Canceled" ? colors.statusCancelled : colors.accent;
+                 return (
+@@ -566,7 +615,7 @@ export default function StatsScreen() {
+ 
+ const styles = StyleSheet.create({
+   container: { flex: 1 },
+-  content: { padding: 20, paddingBottom: 40 },
++  content: { padding: 20, paddingBottom: 140 },
+   pageHeader: {
+     flexDirection: "row",
+     justifyContent: "space-between",
+@@ -643,6 +692,10 @@ const styles = StyleSheet.create({
+   recentTasks: { fontSize: 12, fontWeight: "600" as const },
+   loadingWrap: { flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 8, paddingVertical: 20 },
+   loadingText: { fontSize: 13 },
++  errorCard: {
++    flexDirection: "column", alignItems: "center", borderRadius: 12, padding: 16, marginBottom: 12, borderWidth: 1, gap: 6,
++  },
++  errorText: { fontSize: 13, fontWeight: "500" as const },
+   allTimeCard: { borderRadius: 16, padding: 14, marginBottom: 10, borderWidth: 1 },
+   allTimeGrid: { flexDirection: "row", alignItems: "center", marginBottom: 12 },
+   allTimeItem: { flex: 1, alignItems: "center" },
+diff --git a/constants/translations.ts b/constants/translations.ts
+new file mode 100644
+index 0000000..0a6d3e4
+--- /dev/null
++++ b/constants/translations.ts
+@@ -0,0 +1,347 @@
++export type Language = "en" | "es";
++
++export interface Translations {
++  onboarding: {
++    welcome: string;
++    welcomeSub: string;
++    selectLanguage: string;
++    selectTheme: string;
++    lightMode: string;
++    darkMode: string;
++    selectName: string;
++    selectNameSub: string;
++    selectRig: string;
++    selectRigSub: string;
++    noRigs: string;
++    next: string;
++    back: string;
++    getStarted: string;
++    letsGo: string;
++    step: string;
++    of: string;
++    skipRig: string;
++  };
++  tabs: {
++    collect: string;
++    live: string;
++    stats: string;
++    tools: string;
++  };
++  common: {
++    assign: string;
++    done: string;
++    cancel: string;
++    save: string;
++    retry: string;
++    loading: string;
++    error: string;
++    hours: string;
++    notes: string;
++    task: string;
++    collector: string;
++    open: string;
++  };
++  headers: {
++    collect: string;
++    taskflow: string;
++    stats: string;
++    tools: string;
++    leaderboard: string;
++  };
++  tools: {
++    myProfile: string;
++    whoAreYou: string;
++    yourRig: string;
++    selectName: string;
++    selectRig: string;
++    noRigsAssigned: string;
++    collectionTimer: string;
++    switchToLight: string;
++    switchToDark: string;
++    lightDesc: string;
++    darkDesc: string;
++    quickActions: string;
++    language: string;
++    clearCaches: string;
++    clearCachesDesc: string;
++    settingsUtilities: string;
++    adminDashboard: string;
++    dataViewer: string;
++  };
++  stats: {
++    today: string;
++    thisWeek: string;
++    allTime: string;
++    assigned: string;
++    completed: string;
++    uploaded: string;
++    active: string;
++    noCollector: string;
++    noCollectorDesc: string;
++    loadingStats: string;
++    loadingLeaderboard: string;
++    failedStats: string;
++    failedLeaderboard: string;
++    noLeaderboard: string;
++    recentCompletions: string;
++    recentTasks: string;
++    combined: string;
++    rankings: string;
++    mxVsSf: string;
++  };
++  collect: {
++    taskManagement: string;
++    workspace: string;
++    chooseTask: string;
++    enterHours: string;
++    hoursRequired: string;
++    hoursHint: string;
++    addNotes: string;
++    optional: string;
++    saveNoteOnly: string;
++    todayActivity: string;
++    searchTasks: string;
++    tasksFound: string;
++    plannedChunk: string;
++  };
++  live: {
++    rigsActive: string;
++    quickStart: string;
++    syncing: string;
++    liveLabel: string;
++    offLabel: string;
++    resync: string;
++    myStats: string;
++  };
++}
++
++export const translations: Record<Language, Translations> = {
++  en: {
++    onboarding: {
++      welcome: "Welcome to TaskFlow",
++      welcomeSub: "Let's set up your workspace",
++      selectLanguage: "CHOOSE LANGUAGE",
++      selectTheme: "CHOOSE THEME",
++      lightMode: "Light",
++      darkMode: "Dark",
++      selectName: "WHO ARE YOU?",
++      selectNameSub: "Select your collector name",
++      selectRig: "YOUR RIG",
++      selectRigSub: "Select the rig you'll be using",
++      noRigs: "No rigs assigned — you can set this later in Tools",
++      next: "NEXT",
++      back: "BACK",
++      getStarted: "GET STARTED",
++      letsGo: "LET'S GO",
++      step: "Step",
++      of: "of",
++      skipRig: "SKIP FOR NOW",
++    },
++    tabs: {
++      collect: "Collect",
++      live: "LIVE",
++      stats: "Stats",
++      tools: "Tools",
++    },
++    common: {
++      assign: "Assign",
++      done: "Done",
++      cancel: "Cancel",
++      save: "Save",
++      retry: "RETRY",
++      loading: "Loading...",
++      error: "Error",
++      hours: "Hours",
++      notes: "Notes",
++      task: "Task",
++      collector: "Collector",
++      open: "open",
++    },
++    headers: {
++      collect: "COLLECT",
++      taskflow: "TASKFLOW",
++      stats: "STATS",
++      tools: "TOOLS",
++      leaderboard: "LEADERBOARD",
++    },
++    tools: {
++      myProfile: "My Profile",
++      whoAreYou: "Who are you?",
++      yourRig: "Your Rig",
++      selectName: "Select your name...",
++      selectRig: "Select your rig...",
++      noRigsAssigned: "No rigs assigned",
++      collectionTimer: "Collection Timer",
++      switchToLight: "Switch to Light Mode",
++      switchToDark: "Switch to Dark Mode",
++      lightDesc: "Easier on the eyes outdoors",
++      darkDesc: "Better for low-light collection",
++      quickActions: "Quick Actions",
++      language: "Language",
++      clearCaches: "Clear All Caches",
++      clearCachesDesc: "Force refresh all data from server",
++      settingsUtilities: "Settings & Utilities",
++      adminDashboard: "Admin Dashboard",
++      dataViewer: "Data Viewer",
++    },
++    stats: {
++      today: "TODAY",
++      thisWeek: "THIS WEEK (MON-SUN)",
++      allTime: "ALL TIME",
++      assigned: "Assigned",
++      completed: "Completed",
++      uploaded: "Uploaded",
++      active: "Active",
++      noCollector: "No Collector Selected",
++      noCollectorDesc: "Set your profile in the Tools tab to view stats",
++      loadingStats: "Loading stats...",
++      loadingLeaderboard: "Loading leaderboard...",
++      failedStats: "Failed to load stats",
++      failedLeaderboard: "Failed to load leaderboard",
++      noLeaderboard: "No leaderboard data available",
++      recentCompletions: "RECENT COMPLETIONS",
++      recentTasks: "Recent Tasks",
++      combined: "Combined",
++      rankings: "Rankings",
++      mxVsSf: "MX vs SF THIS WEEK",
++    },
++    collect: {
++      taskManagement: "Task Management",
++      workspace: "'s Workspace",
++      chooseTask: "Choose a task...",
++      enterHours: "Enter hours (e.g. 1.5)",
++      hoursRequired: "required",
++      hoursHint: "You must enter your actual hours before submitting",
++      addNotes: "Add notes...",
++      optional: "optional",
++      saveNoteOnly: "Save Note Only",
++      todayActivity: "Today's Activity",
++      searchTasks: "Search tasks...",
++      tasksFound: "tasks found...",
++      plannedChunk: "Planned chunk:",
++    },
++    live: {
++      rigsActive: "rigs active",
++      quickStart: "QUICK START",
++      syncing: "SYNCING",
++      liveLabel: "LIVE",
++      offLabel: "OFF",
++      resync: "RESYNC",
++      myStats: "MY STATS",
++    },
++  },
++  es: {
++    onboarding: {
++      welcome: "Bienvenido a TaskFlow",
++      welcomeSub: "Configuremos tu espacio de trabajo",
++      selectLanguage: "ELIGE IDIOMA",
++      selectTheme: "ELIGE TEMA",
++      lightMode: "Claro",
++      darkMode: "Oscuro",
++      selectName: "¿QUIÉN ERES?",
++      selectNameSub: "Selecciona tu nombre de recolector",
++      selectRig: "TU RIG",
++      selectRigSub: "Selecciona el rig que vas a usar",
++      noRigs: "Sin rigs asignados — puedes configurarlo después en Herramientas",
++      next: "SIGUIENTE",
++      back: "ATRÁS",
++      getStarted: "COMENZAR",
++      letsGo: "¡VAMOS!",
++      step: "Paso",
++      of: "de",
++      skipRig: "OMITIR POR AHORA",
++    },
++    tabs: {
++      collect: "Recolectar",
++      live: "EN VIVO",
++      stats: "Estadísticas",
++      tools: "Herramientas",
++    },
++    common: {
++      assign: "Asignar",
++      done: "Hecho",
++      cancel: "Cancelar",
++      save: "Guardar",
++      retry: "REINTENTAR",
++      loading: "Cargando...",
++      error: "Error",
++      hours: "Horas",
++      notes: "Notas",
++      task: "Tarea",
++      collector: "Recolector",
++      open: "abiertas",
++    },
++    headers: {
++      collect: "RECOLECTAR",
++      taskflow: "TASKFLOW",
++      stats: "ESTADÍSTICAS",
++      tools: "HERRAMIENTAS",
++      leaderboard: "CLASIFICACIÓN",
++    },
++    tools: {
++      myProfile: "Mi Perfil",
++      whoAreYou: "¿Quién eres?",
++      yourRig: "Tu Rig",
++      selectName: "Selecciona tu nombre...",
++      selectRig: "Selecciona tu rig...",
++      noRigsAssigned: "Sin rigs asignados",
++      collectionTimer: "Temporizador",
++      switchToLight: "Cambiar a Modo Claro",
++      switchToDark: "Cambiar a Modo Oscuro",
++      lightDesc: "Mejor para exteriores",
++      darkDesc: "Mejor para poca luz",
++      quickActions: "Acciones Rápidas",
++      language: "Idioma",
++      clearCaches: "Limpiar Caché",
++      clearCachesDesc: "Actualizar datos del servidor",
++      settingsUtilities: "Ajustes y Utilidades",
++      adminDashboard: "Panel de Admin",
++      dataViewer: "Visor de Datos",
++    },
++    stats: {
++      today: "HOY",
++      thisWeek: "ESTA SEMANA (LUN-DOM)",
++      allTime: "TOTAL",
++      assigned: "Asignadas",
++      completed: "Completadas",
++      uploaded: "Subidas",
++      active: "Activas",
++      noCollector: "Sin Recolector",
++      noCollectorDesc: "Configura tu perfil en Herramientas para ver estadísticas",
++      loadingStats: "Cargando estadísticas...",
++      loadingLeaderboard: "Cargando clasificación...",
++      failedStats: "Error al cargar estadísticas",
++      failedLeaderboard: "Error al cargar clasificación",
++      noLeaderboard: "Sin datos de clasificación",
++      recentCompletions: "COMPLETADAS RECIENTES",
++      recentTasks: "Tareas Recientes",
++      combined: "Todos",
++      rankings: "Clasificación",
++      mxVsSf: "MX vs SF ESTA SEMANA",
++    },
++    collect: {
++      taskManagement: "Gestión de Tareas",
++      workspace: " — Espacio de Trabajo",
++      chooseTask: "Elige una tarea...",
++      enterHours: "Ingresa horas (ej. 1.5)",
++      hoursRequired: "obligatorio",
++      hoursHint: "Debes ingresar tus horas antes de enviar",
++      addNotes: "Agregar notas...",
++      optional: "opcional",
++      saveNoteOnly: "Guardar Solo Nota",
++      todayActivity: "Actividad de Hoy",
++      searchTasks: "Buscar tareas...",
++      tasksFound: "tareas encontradas...",
++      plannedChunk: "Bloque planeado:",
++    },
++    live: {
++      rigsActive: "rigs activos",
++      quickStart: "INICIO RÁPIDO",
++      syncing: "SINCRONIZANDO",
++      liveLabel: "EN VIVO",
++      offLabel: "FUERA",
++      resync: "RESINCRONIZAR",
++      myStats: "MIS DATOS",
++    },
++  },
++};
+diff --git a/providers/LanguageProvider.tsx b/providers/LanguageProvider.tsx
+new file mode 100644
+index 0000000..1f34f46
+--- /dev/null
++++ b/providers/LanguageProvider.tsx
+@@ -0,0 +1,29 @@
++import { useState, useEffect, useCallback, useMemo } from "react";
++import AsyncStorage from "@react-native-async-storage/async-storage";
++import createContextHook from "@nkzw/create-context-hook";
++import { translations, Language, Translations } from "@/constants/translations";
++
++const LANGUAGE_KEY = "tf_language";
++
++export const [LanguageProvider, useLanguage] = createContextHook(() => {
++  const [language, setLanguageState] = useState<Language>("en");
++  const [loaded, setLoaded] = useState(false);
++
++  useEffect(() => {
++    AsyncStorage.getItem(LANGUAGE_KEY).then((stored) => {
++      if (stored === "en" || stored === "es") {
++        setLanguageState(stored);
++      }
++      setLoaded(true);
++    });
++  }, []);
++
++  const setLanguage = useCallback(async (lang: Language) => {
++    setLanguageState(lang);
++    await AsyncStorage.setItem(LANGUAGE_KEY, lang);
++  }, []);
++
++  const t: Translations = useMemo(() => translations[language], [language]);
++
++  return { language, setLanguage, t, loaded };
++});
+diff --git a/scripts/appscript.gs b/scripts/appscript.gs
+new file mode 100644
+index 0000000..dcd087d
+--- /dev/null
++++ b/scripts/appscript.gs
+@@ -0,0 +1,528 @@
++/**
++ * TaskFlow Google Apps Script — v2
++ *
++ * Reads CA_TAGGED for leaderboard data (collector, site, hours).
++ * Uses Collectors sheet (A = Name, B = Rig-ID) to map rigs → names
++ * when CA_TAGGED is missing collector names.
++ * Region comes from the Site column (C) in CA_TAGGED.
++ * Stats pull from both Collector Task Assignments Log AND CA_TAGGED,
++ * using the higher hours value.
++ * Writes leaderboard results to _AppCache for faster subsequent reads.
++ */
++
++/* ------------------------------------------------------------------ */
++/*  Globals                                                            */
++/* ------------------------------------------------------------------ */
++
++var SPREADSHEET_ID = PropertiesService.getScriptProperties().getProperty('SPREADSHEET_ID');
++
++function getSheet(name) {
++  var ss = SpreadsheetApp.openById(SPREADSHEET_ID);
++  return ss.getSheetByName(name);
++}
++
++/* ------------------------------------------------------------------ */
++/*  Web-app entry points                                               */
++/* ------------------------------------------------------------------ */
++
++function doGet(e) {
++  var action = (e.parameter.action || '').trim();
++  var result;
++  try {
++    switch (action) {
++      case 'getCollectors':       result = handleGetCollectors(); break;
++      case 'getTasks':            result = handleGetTasks(); break;
++      case 'getTodayLog':         result = handleGetTodayLog(e.parameter.collector || ''); break;
++      case 'getCollectorStats':   result = handleGetCollectorStats(e.parameter.collector || ''); break;
++      case 'getLeaderboard':      result = handleGetLeaderboard(); break;
++      case 'getRecollections':    result = handleGetRecollections(); break;
++      case 'getFullLog':          result = handleGetFullLog(e.parameter.collector || ''); break;
++      case 'getTaskActualsSheet': result = handleGetTaskActuals(); break;
++      case 'getAdminDashboardData': result = handleGetAdminDashboard(); break;
++      case 'getAdminCollectors':  result = handleGetAdminCollectors(); break;
++      case 'getTaskRequirements': result = handleGetTaskRequirements(); break;
++      default:
++        return jsonResponse({ success: false, error: 'Unknown action: ' + action });
++    }
++    return jsonResponse({ success: true, data: result });
++  } catch (err) {
++    return jsonResponse({ success: false, error: err.message });
++  }
++}
++
++function doPost(e) {
++  try {
++    var body = JSON.parse(e.postData.contents);
++    var result = handleSubmit(body);
++    return jsonResponse({ success: true, data: result, message: result.message || 'OK' });
++  } catch (err) {
++    return jsonResponse({ success: false, error: err.message });
++  }
++}
++
++function jsonResponse(obj) {
++  return ContentService
++    .createTextOutput(JSON.stringify(obj))
++    .setMimeType(ContentService.MimeType.JSON);
++}
++
++/* ------------------------------------------------------------------ */
++/*  Collectors (A = Name, B = Rig-ID)                                  */
++/* ------------------------------------------------------------------ */
++
++function handleGetCollectors() {
++  var sheet = getSheet('Collectors');
++  if (!sheet) return [];
++  var data = sheet.getDataRange().getValues();
++  var map = {};
++  for (var i = 1; i < data.length; i++) {
++    var name = String(data[i][0] || '').trim();
++    var rig  = String(data[i][1] || '').trim();
++    if (!name) continue;
++    if (!map[name]) map[name] = [];
++    if (rig) map[name].push(rig);
++  }
++  return Object.keys(map).map(function(n) {
++    return { name: n, rigs: map[n] };
++  });
++}
++
++/* ------------------------------------------------------------------ */
++/*  Admin: full collector detail list                                   */
++/* ------------------------------------------------------------------ */
++
++function handleGetAdminCollectors() {
++  var collectorsSheet = getSheet('Collectors');
++  if (!collectorsSheet) return [];
++  var cData = collectorsSheet.getDataRange().getValues();
++
++  var collectors = {};
++  for (var i = 1; i < cData.length; i++) {
++    var name  = String(cData[i][0] || '').trim();
++    var rig   = String(cData[i][1] || '').trim();
++    var email = String(cData[i][2] || '').trim();
++    if (!name) continue;
++    if (!collectors[name]) {
++      collectors[name] = { name: name, rigs: [], email: email, totalHours: 0, rating: '' };
++    }
++    if (rig) collectors[name].rigs.push(rig);
++  }
++
++  var caSheet = getSheet('CA_TAGGED');
++  if (caSheet) {
++    var caData = caSheet.getDataRange().getValues();
++    for (var j = 1; j < caData.length; j++) {
++      var cName = String(caData[j][0] || '').trim();
++      var hours = parseFloat(caData[j][3]) || 0;
++      if (cName && collectors[cName]) {
++        collectors[cName].totalHours += hours;
++      }
++    }
++  }
++
++  return Object.keys(collectors).map(function(n) { return collectors[n]; });
++}
++
++/* ------------------------------------------------------------------ */
++/*  Task Requirements from RS_Task_Req                                 */
++/* ------------------------------------------------------------------ */
++
++function handleGetTaskRequirements() {
++  var sheet = getSheet('RS_Task_Req');
++  if (!sheet) return [];
++  var data = sheet.getDataRange().getValues();
++  var rows = [];
++  for (var i = 1; i < data.length; i++) {
++    rows.push({
++      taskName:      String(data[i][0] || ''),
++      requiredHours: parseFloat(data[i][1]) || 0,
++      collectedHours: parseFloat(data[i][2]) || 0,
++      remainingHours: parseFloat(data[i][3]) || 0,
++      status:        String(data[i][4] || ''),
++    });
++  }
++  return rows;
++}
++
++/* ------------------------------------------------------------------ */
++/*  Leaderboard — reads CA_TAGGED (the correct sheet)                  */
++/* ------------------------------------------------------------------ */
++
++function handleGetLeaderboard() {
++  var cached = readCache('leaderboard');
++  if (cached) return cached;
++
++  var caSheet = getSheet('CA_TAGGED');
++  if (!caSheet) return [];
++
++  var rigToName = buildRigToNameMap();
++  var caData = caSheet.getDataRange().getValues();
++
++  var collectors = {};
++
++  for (var i = 1; i < caData.length; i++) {
++    var rigOrName = String(caData[i][1] || '').trim();   // B = rig number
++    var site      = String(caData[i][2] || '').trim();   // C = site (MX / SF)
++    var hours     = parseFloat(caData[i][3]) || 0;       // D = hours
++    var nameCell  = String(caData[i][0] || '').trim();   // A = collector name (may be blank)
++
++    var collectorName = nameCell || rigToName[rigOrName] || rigOrName;
++    if (!collectorName) continue;
++
++    var region = site.toUpperCase().indexOf('SF') >= 0 ? 'SF' : 'MX';
++
++    if (!collectors[collectorName]) {
++      collectors[collectorName] = { name: collectorName, region: region, hours: 0, tasks: 0, assigned: 0 };
++    }
++    collectors[collectorName].hours += hours;
++    collectors[collectorName].tasks += 1;
++    collectors[collectorName].assigned += 1;
++    if (!collectors[collectorName].region || collectors[collectorName].region === 'MX') {
++      collectors[collectorName].region = region;
++    }
++  }
++
++  var logSheet = getSheet('Collector Task Assignments Log');
++  if (logSheet) {
++    var logData = logSheet.getDataRange().getValues();
++    for (var j = 1; j < logData.length; j++) {
++      var logName  = String(logData[j][0] || '').trim();
++      var logHours = parseFloat(logData[j][4]) || 0;
++      if (logName && collectors[logName]) {
++        if (logHours > 0) {
++          collectors[logName].hours = Math.max(collectors[logName].hours, collectors[logName].hours);
++        }
++      } else if (logName) {
++        collectors[logName] = { name: logName, region: 'MX', hours: logHours, tasks: 1, assigned: 1 };
++      }
++    }
++  }
++
++  var entries = Object.keys(collectors).map(function(n) { return collectors[n]; });
++  entries.sort(function(a, b) { return b.hours - a.hours; });
++
++  var result = entries.map(function(e, idx) {
++    var rate = e.assigned > 0 ? Math.round((e.tasks / e.assigned) * 100) : 0;
++    return {
++      rank:            idx + 1,
++      collectorName:   e.name,
++      hoursLogged:     e.hours,
++      tasksCompleted:  e.tasks,
++      tasksAssigned:   e.assigned,
++      completionRate:  rate,
++      region:          e.region,
++    };
++  });
++
++  writeCache('leaderboard', result);
++  return result;
++}
++
++/* ------------------------------------------------------------------ */
++/*  Rig-ID → Collector-Name lookup from Collectors sheet               */
++/* ------------------------------------------------------------------ */
++
++function buildRigToNameMap() {
++  var sheet = getSheet('Collectors');
++  if (!sheet) return {};
++  var data = sheet.getDataRange().getValues();
++  var map = {};
++  for (var i = 1; i < data.length; i++) {
++    var name = String(data[i][0] || '').trim();
++    var rig  = String(data[i][1] || '').trim();
++    if (name && rig) map[rig] = name;
++  }
++  return map;
++}
++
++/* ------------------------------------------------------------------ */
++/*  Simple _AppCache read / write                                      */
++/* ------------------------------------------------------------------ */
++
++function readCache(key) {
++  try {
++    var sheet = getSheet('_AppCache');
++    if (!sheet) return null;
++    var data = sheet.getDataRange().getValues();
++    for (var i = 0; i < data.length; i++) {
++      if (String(data[i][0]).trim() === key) {
++        var ts = parseInt(data[i][2], 10) || 0;
++        if (Date.now() - ts > 15 * 60 * 1000) return null;
++        return JSON.parse(data[i][1]);
++      }
++    }
++  } catch (e) { /* ignore cache read errors */ }
++  return null;
++}
++
++function writeCache(key, value) {
++  try {
++    var ss = SpreadsheetApp.openById(SPREADSHEET_ID);
++    var sheet = ss.getSheetByName('_AppCache');
++    if (!sheet) {
++      sheet = ss.insertSheet('_AppCache');
++      sheet.appendRow(['key', 'value', 'timestamp']);
++    }
++    var data = sheet.getDataRange().getValues();
++    for (var i = 0; i < data.length; i++) {
++      if (String(data[i][0]).trim() === key) {
++        sheet.getRange(i + 1, 2).setValue(JSON.stringify(value));
++        sheet.getRange(i + 1, 3).setValue(Date.now());
++        return;
++      }
++    }
++    sheet.appendRow([key, JSON.stringify(value), Date.now()]);
++  } catch (e) { /* ignore cache write errors */ }
++}
++
++/* ------------------------------------------------------------------ */
++/*  Remaining handlers (tasks, logs, stats, etc.)                      */
++/* ------------------------------------------------------------------ */
++
++function handleGetTasks() {
++  var sheet = getSheet('RS_Task_Req');
++  if (!sheet) return [];
++  var data = sheet.getDataRange().getValues();
++  var tasks = [];
++  for (var i = 1; i < data.length; i++) {
++    var name = String(data[i][0] || '').trim();
++    if (name) tasks.push({ name: name });
++  }
++  return tasks;
++}
++
++function handleGetTodayLog(collector) {
++  var sheet = getSheet('Collector Task Assignments Log');
++  if (!sheet || !collector) return [];
++  var data = sheet.getDataRange().getValues();
++  var today = Utilities.formatDate(new Date(), 'America/Los_Angeles', 'yyyy-MM-dd');
++  var entries = [];
++  for (var i = 1; i < data.length; i++) {
++    var rowCollector = String(data[i][0] || '').trim();
++    if (rowCollector !== collector) continue;
++    var dateVal = data[i][6];
++    var dateStr = dateVal instanceof Date
++      ? Utilities.formatDate(dateVal, 'America/Los_Angeles', 'yyyy-MM-dd')
++      : String(dateVal || '');
++    if (dateStr.indexOf(today) < 0) continue;
++    entries.push({
++      assignmentId:  String(data[i][8] || 'a_' + i),
++      taskId:        String(data[i][1] || ''),
++      taskName:      String(data[i][1] || ''),
++      status:        String(data[i][3] || 'In Progress'),
++      loggedHours:   parseFloat(data[i][4]) || 0,
++      plannedHours:  parseFloat(data[i][5]) || 0,
++      remainingHours: parseFloat(data[i][7]) || 0,
++      notes:         String(data[i][9] || ''),
++      assignedDate:  dateStr,
++      completedDate: String(data[i][10] || ''),
++    });
++  }
++  return entries;
++}
++
++function handleGetCollectorStats(collector) {
++  if (!collector) throw new Error('collector param required');
++  var logSheet = getSheet('Collector Task Assignments Log');
++  var totalAssigned = 0, totalCompleted = 0, totalCanceled = 0;
++  var totalLoggedHours = 0, totalPlannedHours = 0;
++  var weeklyLoggedHours = 0, weeklyCompleted = 0, activeTasks = 0;
++  var topTasks = [];
++
++  var now = new Date();
++  var dayOfWeek = now.getDay();
++  var mondayOffset = dayOfWeek === 0 ? -6 : 1 - dayOfWeek;
++  var weekStart = new Date(now);
++  weekStart.setDate(now.getDate() + mondayOffset);
++  weekStart.setHours(0, 0, 0, 0);
++
++  if (logSheet) {
++    var data = logSheet.getDataRange().getValues();
++    for (var i = 1; i < data.length; i++) {
++      var rowName = String(data[i][0] || '').trim();
++      if (rowName !== collector) continue;
++      totalAssigned++;
++      var status = String(data[i][3] || '');
++      var logged = parseFloat(data[i][4]) || 0;
++      var planned = parseFloat(data[i][5]) || 0;
++      totalLoggedHours += logged;
++      totalPlannedHours += planned;
++      if (status === 'Completed') totalCompleted++;
++      else if (status === 'Canceled') totalCanceled++;
++      else activeTasks++;
++
++      var dateVal = data[i][6];
++      if (dateVal instanceof Date && dateVal >= weekStart) {
++        weeklyLoggedHours += logged;
++        if (status === 'Completed') weeklyCompleted++;
++      }
++      topTasks.push({ name: String(data[i][1] || ''), hours: logged, status: status });
++    }
++  }
++
++  var caSheet = getSheet('CA_TAGGED');
++  if (caSheet) {
++    var caData = caSheet.getDataRange().getValues();
++    var caHours = 0;
++    for (var j = 1; j < caData.length; j++) {
++      var caName = String(caData[j][0] || '').trim();
++      if (caName === collector) {
++        caHours += parseFloat(caData[j][3]) || 0;
++      }
++    }
++    if (caHours > totalLoggedHours) {
++      totalLoggedHours = caHours;
++    }
++  }
++
++  var completionRate = totalAssigned > 0 ? (totalCompleted / totalAssigned) * 100 : 0;
++  var avgHoursPerTask = totalCompleted > 0 ? totalLoggedHours / totalCompleted : 0;
++
++  topTasks.sort(function(a, b) { return b.hours - a.hours; });
++
++  return {
++    collectorName:    collector,
++    totalAssigned:    totalAssigned,
++    totalCompleted:   totalCompleted,
++    totalCanceled:    totalCanceled,
++    totalLoggedHours: totalLoggedHours,
++    totalPlannedHours: totalPlannedHours,
++    weeklyLoggedHours: weeklyLoggedHours,
++    weeklyCompleted:  weeklyCompleted,
++    activeTasks:      activeTasks,
++    completionRate:   completionRate,
++    avgHoursPerTask:  avgHoursPerTask,
++    topTasks:         topTasks.slice(0, 10),
++  };
++}
++
++function handleGetRecollections() {
++  var sheet = getSheet('Collector Task Assignments Log');
++  if (!sheet) return [];
++  var data = sheet.getDataRange().getValues();
++  var items = [];
++  for (var i = 1; i < data.length; i++) {
++    var status = String(data[i][3] || '');
++    var remaining = parseFloat(data[i][7]) || 0;
++    if ((status === 'Partial' || remaining > 0) && status !== 'Completed' && status !== 'Canceled') {
++      var task = String(data[i][1] || '');
++      var collector = String(data[i][0] || '');
++      items.push(collector + ': ' + task + ' (' + remaining + 'h left)');
++    }
++  }
++  return items;
++}
++
++function handleGetFullLog(collector) {
++  var sheet = getSheet('Collector Task Assignments Log');
++  if (!sheet) return [];
++  var data = sheet.getDataRange().getValues();
++  var entries = [];
++  for (var i = 1; i < data.length; i++) {
++    var rowName = String(data[i][0] || '').trim();
++    if (collector && rowName !== collector) continue;
++    entries.push({
++      collector:      rowName,
++      taskName:       String(data[i][1] || ''),
++      status:         String(data[i][3] || ''),
++      loggedHours:    parseFloat(data[i][4]) || 0,
++      plannedHours:   parseFloat(data[i][5]) || 0,
++      remainingHours: parseFloat(data[i][7]) || 0,
++      assignedDate:   String(data[i][6] || ''),
++    });
++  }
++  return entries;
++}
++
++function handleGetTaskActuals() {
++  var sheet = getSheet('RS_Task_Req');
++  if (!sheet) return [];
++  var data = sheet.getDataRange().getValues();
++  var rows = [];
++  for (var i = 1; i < data.length; i++) {
++    rows.push({
++      taskName:       String(data[i][0] || ''),
++      status:         String(data[i][4] || ''),
++      collectedHours: parseFloat(data[i][2]) || 0,
++      goodHours:      parseFloat(data[i][5]) || 0,
++      remainingHours: parseFloat(data[i][3]) || 0,
++      lastRedash:     String(data[i][6] || ''),
++    });
++  }
++  return rows;
++}
++
++function handleGetAdminDashboard() {
++  var sheet = getSheet('Collector Task Assignments Log');
++  var totalTasks = 0, completedTasks = 0, inProgressTasks = 0, recollectTasks = 0;
++  var recollections = [];
++  if (sheet) {
++    var data = sheet.getDataRange().getValues();
++    for (var i = 1; i < data.length; i++) {
++      totalTasks++;
++      var status = String(data[i][3] || '');
++      if (status === 'Completed') completedTasks++;
++      else if (status === 'In Progress') inProgressTasks++;
++      var remaining = parseFloat(data[i][7]) || 0;
++      if ((status === 'Partial' || remaining > 0) && status !== 'Completed' && status !== 'Canceled') {
++        recollectTasks++;
++        recollections.push(String(data[i][0] || '') + ': ' + String(data[i][1] || '') + ' (' + remaining + 'h)');
++      }
++    }
++  }
++  return {
++    totalTasks:      totalTasks,
++    completedTasks:  completedTasks,
++    inProgressTasks: inProgressTasks,
++    recollectTasks:  recollectTasks,
++    recollections:   recollections,
++  };
++}
++
++function handleSubmit(body) {
++  var collector  = String(body.collector || '').trim();
++  var task       = String(body.task || '').trim();
++  var hours      = parseFloat(body.hours) || 0;
++  var actionType = String(body.actionType || '').trim();
++  var notes      = String(body.notes || '').trim();
++
++  if (!collector || !task) throw new Error('collector and task are required');
++  if (!actionType) throw new Error('actionType is required');
++
++  var sheet = getSheet('Collector Task Assignments Log');
++  if (!sheet) throw new Error('Log sheet not found');
++
++  var now = new Date();
++  var dateStr = Utilities.formatDate(now, 'America/Los_Angeles', 'yyyy-MM-dd HH:mm:ss');
++  var assignmentId = 'a_' + now.getTime();
++
++  if (actionType === 'ASSIGN') {
++    sheet.appendRow([collector, task, '', 'In Progress', hours, hours, dateStr, 0, assignmentId, notes, '']);
++    return { success: true, message: 'Task assigned', assignmentId: assignmentId, planned: hours, hours: hours, status: 'In Progress' };
++  }
++
++  var data = sheet.getDataRange().getValues();
++  for (var i = data.length - 1; i >= 1; i--) {
++    if (String(data[i][0]).trim() === collector && String(data[i][1]).trim() === task) {
++      if (actionType === 'COMPLETE') {
++        sheet.getRange(i + 1, 4).setValue('Completed');
++        sheet.getRange(i + 1, 5).setValue(hours);
++        sheet.getRange(i + 1, 11).setValue(dateStr);
++        if (notes) sheet.getRange(i + 1, 10).setValue(notes);
++        return { success: true, message: 'Task completed', hours: hours, status: 'Completed' };
++      }
++      if (actionType === 'CANCEL') {
++        sheet.getRange(i + 1, 4).setValue('Canceled');
++        sheet.getRange(i + 1, 11).setValue(dateStr);
++        return { success: true, message: 'Task canceled', status: 'Canceled' };
++      }
++      if (actionType === 'NOTE_ONLY') {
++        var existing = String(data[i][9] || '');
++        sheet.getRange(i + 1, 10).setValue(existing ? existing + '\n' + notes : notes);
++        return { success: true, message: 'Note saved' };
++      }
++    }
++  }
++
++  throw new Error('Task not found for ' + collector + ': ' + task);
++}
+diff --git a/services/googleSheets.ts b/services/googleSheets.ts
+index 5b3ce27..1f290c5 100644
+--- a/services/googleSheets.ts
++++ b/services/googleSheets.ts
+@@ -1,4 +1,5 @@
+-import { Collector, Task, LogEntry, SubmitPayload, SubmitResponse, CollectorStats, TaskActualRow, FullLogEntry, AdminDashboardData, LeaderboardEntry } from "@/types";
++import AsyncStorage from "@react-native-async-storage/async-storage";
++import { Collector, Task, LogEntry, SubmitPayload, SubmitResponse, CollectorStats, TaskActualRow, FullLogEntry, AdminDashboardData, LeaderboardEntry, AdminCollectorDetail, TaskRequirement } from "@/types";
+ 
+ const DEFAULT_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbzvhVIEe-P-aqiy1UwOWXPSXan0nwLMD5tkDJhrLX7gXsRn3-nCkB4f3Ov7K12dpH_Z6g/exec";
+ const REQUEST_TIMEOUT_MS = 15000;
+@@ -7,6 +8,121 @@ const RETRYABLE_STATUS_CODES = new Set([408, 429, 500, 502, 503, 504]);
+ const RETRYABLE_ERROR_PATTERNS = [/network/i, /timeout/i, /abort/i, /failed to fetch/i];
+ const RETRY_DELAY_MS = [400, 1200];
+ 
++/* ------------------------------------------------------------------ */
++/*  3-tier cache: Memory → AsyncStorage → API                         */
++/* ------------------------------------------------------------------ */
++
++interface CacheEntry<T> {
++  data: T;
++  ts: number;
++}
++
++const memoryCache = new Map<string, CacheEntry<unknown>>();
++
++const MEMORY_TTL: Record<string, number> = {
++  collectors: 5 * 60 * 1000,
++  tasks: 5 * 60 * 1000,
++  leaderboard: 2 * 60 * 1000,
++  adminDashboard: 60 * 1000,
++  adminCollectors: 2 * 60 * 1000,
++  taskRequirements: 2 * 60 * 1000,
++  default: 30 * 1000,
++};
++
++const STORAGE_TTL: Record<string, number> = {
++  collectors: 30 * 60 * 1000,
++  tasks: 30 * 60 * 1000,
++  leaderboard: 10 * 60 * 1000,
++  adminDashboard: 5 * 60 * 1000,
++  adminCollectors: 10 * 60 * 1000,
++  taskRequirements: 10 * 60 * 1000,
++  default: 2 * 60 * 1000,
++};
++
++function getMemoryTTL(key: string): number {
++  const base = key.split(":")[0];
++  return MEMORY_TTL[base] ?? MEMORY_TTL.default;
++}
++
++function getStorageTTL(key: string): number {
++  const base = key.split(":")[0];
++  return STORAGE_TTL[base] ?? STORAGE_TTL.default;
++}
++
++function getFromMemory<T>(key: string): T | null {
++  const entry = memoryCache.get(key) as CacheEntry<T> | undefined;
++  if (!entry) return null;
++  if (Date.now() - entry.ts > getMemoryTTL(key)) {
++    memoryCache.delete(key);
++    return null;
++  }
++  return entry.data;
++}
++
++function setInMemory<T>(key: string, data: T): void {
++  memoryCache.set(key, { data, ts: Date.now() });
++}
++
++async function getFromStorage<T>(key: string): Promise<T | null> {
++  try {
++    const raw = await AsyncStorage.getItem(`tf_cache_${key}`);
++    if (!raw) return null;
++    const entry = JSON.parse(raw) as CacheEntry<T>;
++    if (Date.now() - entry.ts > getStorageTTL(key)) {
++      AsyncStorage.removeItem(`tf_cache_${key}`).catch(() => {});
++      return null;
++    }
++    return entry.data;
++  } catch {
++    return null;
++  }
++}
++
++async function setInStorage<T>(key: string, data: T): Promise<void> {
++  try {
++    await AsyncStorage.setItem(`tf_cache_${key}`, JSON.stringify({ data, ts: Date.now() }));
++  } catch {
++    // storage full or unavailable
++  }
++}
++
++async function cachedApiGet<T>(cacheKey: string, fetcher: () => Promise<T>): Promise<T> {
++  const mem = getFromMemory<T>(cacheKey);
++  if (mem !== null) return mem;
++
++  const stored = await getFromStorage<T>(cacheKey);
++  if (stored !== null) {
++    setInMemory(cacheKey, stored);
++    fetcher().then(fresh => {
++      setInMemory(cacheKey, fresh);
++      setInStorage(cacheKey, fresh);
++    }).catch(() => {});
++    return stored;
++  }
++
++  const fresh = await fetcher();
++  setInMemory(cacheKey, fresh);
++  setInStorage(cacheKey, fresh);
++  return fresh;
++}
++
++export async function clearAllCaches(): Promise<void> {
++  memoryCache.clear();
++  try {
++    const keys = await AsyncStorage.getAllKeys();
++    const cacheKeys = keys.filter(k => k.startsWith("tf_cache_"));
++    if (cacheKeys.length > 0) {
++      await AsyncStorage.multiRemove(cacheKeys);
++    }
++  } catch {
++    // ignore
++  }
++  console.log("[Cache] All caches cleared");
++}
++
++/* ------------------------------------------------------------------ */
++/*  URL & HTTP helpers                                                 */
++/* ------------------------------------------------------------------ */
+ 
+ function normalizeScriptUrl(raw: string): string {
+   const trimmed = raw.trim().replace(/^['"]|['"]$/g, "");
+@@ -36,16 +152,11 @@ interface ApiResponse<T> {
+ function createTimeoutController(ms: number): { controller: AbortController; cancel: () => void } {
+   const controller = new AbortController();
+   const timer = setTimeout(() => controller.abort(), ms);
+-  return {
+-    controller,
+-    cancel: () => clearTimeout(timer),
+-  };
++  return { controller, cancel: () => clearTimeout(timer) };
+ }
+ 
+ function sleep(ms: number): Promise<void> {
+-  return new Promise((resolve) => {
+-    setTimeout(resolve, ms);
+-  });
++  return new Promise((resolve) => setTimeout(resolve, ms));
+ }
+ 
+ function shouldRetryError(error: unknown): boolean {
+@@ -73,36 +184,29 @@ async function parseApiResponse<T>(response: Response): Promise<ApiResponse<T>>
+ 
+ async function apiGet<T>(action: string, params: Record<string, string> = {}): Promise<T> {
+   const scriptUrl = getScriptUrl();
+-  if (!scriptUrl) {
+-    throw new Error("Google Script URL not configured. Set EXPO_PUBLIC_GOOGLE_SCRIPT_URL.");
+-  }
++  if (!scriptUrl) throw new Error("Google Script URL not configured. Set EXPO_PUBLIC_GOOGLE_SCRIPT_URL.");
+ 
+   const url = new URL(scriptUrl);
+   url.searchParams.set("action", action);
+   Object.entries(params).forEach(([k, v]) => {
+-    if (v !== "") {
+-      url.searchParams.set(k, v);
+-    }
++    if (v !== "") url.searchParams.set(k, v);
+   });
+ 
+   console.log("[API] GET", action, params);
+ 
+   for (let attempt = 0; attempt <= MAX_RETRY_ATTEMPTS; attempt += 1) {
+     const timeout = createTimeoutController(REQUEST_TIMEOUT_MS);
+-
+     try {
+       const response = await fetch(url.toString(), {
+         redirect: "follow",
+         signal: timeout.controller.signal,
+         cache: "no-store",
+       });
+-
+       timeout.cancel();
+ 
+       if (!response.ok) {
+         const text = await response.text();
+         const retryableStatus = RETRYABLE_STATUS_CODES.has(response.status);
+-        console.log("[API] GET HTTP error:", response.status, "retryable:", retryableStatus, text);
+         if (retryableStatus && attempt < MAX_RETRY_ATTEMPTS) {
+           await sleep(RETRY_DELAY_MS[attempt] ?? 1500);
+           continue;
+@@ -111,18 +215,12 @@ async function apiGet<T>(action: string, params: Record<string, string> = {}): P
+       }
+ 
+       const json = await parseApiResponse<T>(response);
+-      console.log("[API] Response:", JSON.stringify(json).slice(0, 500));
+-
+-      if (!json.success) {
+-        throw new Error(json.error ?? json.message ?? "Unknown API error");
+-      }
+-
++      if (!json.success) throw new Error(json.error ?? json.message ?? "Unknown API error");
+       return json.data as T;
+     } catch (error) {
+       timeout.cancel();
+       const message = error instanceof Error ? error.message : "Network error";
+       const canRetry = attempt < MAX_RETRY_ATTEMPTS && shouldRetryError(error);
+-      console.log("[API] GET request failed:", message, "attempt:", attempt + 1, "retry:", canRetry);
+       if (canRetry) {
+         await sleep(RETRY_DELAY_MS[attempt] ?? 1500);
+         continue;
+@@ -130,21 +228,15 @@ async function apiGet<T>(action: string, params: Record<string, string> = {}): P
+       throw new Error(`Request failed: ${message}`);
+     }
+   }
+-
+   throw new Error("Request failed after retries");
+ }
+ 
+ async function apiPost(payload: SubmitPayload): Promise<SubmitResponse> {
+   const scriptUrl = getScriptUrl();
+-  if (!scriptUrl) {
+-    throw new Error("Google Script URL not configured. Set EXPO_PUBLIC_GOOGLE_SCRIPT_URL.");
+-  }
+-
+-  console.log("[API] POST submit:", JSON.stringify(payload));
++  if (!scriptUrl) throw new Error("Google Script URL not configured. Set EXPO_PUBLIC_GOOGLE_SCRIPT_URL.");
+ 
+   for (let attempt = 0; attempt <= MAX_RETRY_ATTEMPTS; attempt += 1) {
+     const timeout = createTimeoutController(REQUEST_TIMEOUT_MS);
+-
+     try {
+       const response = await fetch(scriptUrl, {
+         method: "POST",
+@@ -154,13 +246,11 @@ async function apiPost(payload: SubmitPayload): Promise<SubmitResponse> {
+         signal: timeout.controller.signal,
+         cache: "no-store",
+       });
+-
+       timeout.cancel();
+ 
+       if (!response.ok) {
+         const text = await response.text();
+         const retryableStatus = RETRYABLE_STATUS_CODES.has(response.status);
+-        console.log("[API] POST HTTP error:", response.status, "retryable:", retryableStatus, text);
+         if (retryableStatus && attempt < MAX_RETRY_ATTEMPTS) {
+           await sleep(RETRY_DELAY_MS[attempt] ?? 1500);
+           continue;
+@@ -169,22 +259,12 @@ async function apiPost(payload: SubmitPayload): Promise<SubmitResponse> {
+       }
+ 
+       const json = await parseApiResponse<SubmitResponse>(response);
+-      console.log("[API] POST response:", JSON.stringify(json));
+-
+-      if (!json.success) {
+-        throw new Error(json.error ?? json.message ?? "Submit failed");
+-      }
+-
+-      return {
+-        success: true,
+-        message: json.message ?? "Success",
+-        ...json.data,
+-      } as SubmitResponse;
++      if (!json.success) throw new Error(json.error ?? json.message ?? "Submit failed");
++      return { success: true, message: json.message ?? "Success", ...json.data } as SubmitResponse;
+     } catch (error) {
+       timeout.cancel();
+       const message = error instanceof Error ? error.message : "Network error";
+       const canRetry = attempt < MAX_RETRY_ATTEMPTS && shouldRetryError(error);
+-      console.log("[API] POST request failed:", message, "attempt:", attempt + 1, "retry:", canRetry);
+       if (canRetry) {
+         await sleep(RETRY_DELAY_MS[attempt] ?? 1500);
+         continue;
+@@ -192,43 +272,48 @@ async function apiPost(payload: SubmitPayload): Promise<SubmitResponse> {
+       throw new Error(`Submit failed: ${message}`);
+     }
+   }
+-
+   throw new Error("Submit failed after retries");
+ }
+ 
+-interface RawCollector {
+-  name: string;
+-  rigs: string[];
+-}
++/* ------------------------------------------------------------------ */
++/*  Public API — all calls go through 3-tier cache where applicable    */
++/* ------------------------------------------------------------------ */
+ 
+-interface RawTask {
+-  name: string;
+-}
++interface RawCollector { name: string; rigs: string[]; }
++interface RawTask { name: string; }
+ 
+ export async function fetchCollectors(): Promise<Collector[]> {
+-  const raw = await apiGet<RawCollector[]>("getCollectors");
+-  return raw.map((c, i) => ({
+-    id: `c_${i}_${c.name.replace(/\s/g, "_")}`,
+-    name: c.name,
+-    rigs: c.rigs ?? [],
+-  }));
++  return cachedApiGet("collectors", async () => {
++    const raw = await apiGet<RawCollector[]>("getCollectors");
++    return raw.map((c, i) => ({
++      id: `c_${i}_${c.name.replace(/\s/g, "_")}`,
++      name: c.name,
++      rigs: c.rigs ?? [],
++    }));
++  });
+ }
+ 
+ export async function fetchTasks(): Promise<Task[]> {
+-  const raw = await apiGet<RawTask[]>("getTasks");
+-  return raw.map((t, i) => ({
+-    id: `t_${i}_${t.name.replace(/\s/g, "_")}`,
+-    name: t.name,
+-    label: t.name,
+-  }));
++  return cachedApiGet("tasks", async () => {
++    const raw = await apiGet<RawTask[]>("getTasks");
++    return raw.map((t, i) => ({
++      id: `t_${i}_${t.name.replace(/\s/g, "_")}`,
++      name: t.name,
++      label: t.name,
++    }));
++  });
+ }
+ 
+ export async function fetchTodayLog(collectorName: string): Promise<LogEntry[]> {
+-  return apiGet<LogEntry[]>("getTodayLog", { collector: collectorName });
++  return cachedApiGet(`todayLog:${collectorName}`, () =>
++    apiGet<LogEntry[]>("getTodayLog", { collector: collectorName })
++  );
+ }
+ 
+ export async function fetchCollectorStats(collectorName: string): Promise<CollectorStats> {
+-  return apiGet<CollectorStats>("getCollectorStats", { collector: collectorName });
++  return cachedApiGet(`collectorStats:${collectorName}`, () =>
++    apiGet<CollectorStats>("getCollectorStats", { collector: collectorName })
++  );
+ }
+ 
+ export async function submitAction(payload: SubmitPayload): Promise<SubmitResponse> {
+@@ -236,41 +321,44 @@ export async function submitAction(payload: SubmitPayload): Promise<SubmitRespon
+ }
+ 
+ export async function fetchRecollections(): Promise<string[]> {
+-  return apiGet<string[]>("getRecollections");
++  return cachedApiGet("recollections", () =>
++    apiGet<string[]>("getRecollections")
++  );
+ }
+ 
+ export async function fetchFullLog(collectorName?: string): Promise<FullLogEntry[]> {
+   const params: Record<string, string> = {};
+   if (collectorName) params.collector = collectorName;
+-  console.log("[API] fetchFullLog", collectorName);
+   return apiGet<FullLogEntry[]>("getFullLog", params);
+ }
+ 
+ export async function fetchTaskActualsData(): Promise<TaskActualRow[]> {
+-  console.log("[API] fetchTaskActualsData");
+-  return apiGet<TaskActualRow[]>("getTaskActualsSheet");
++  return cachedApiGet("taskActuals", () =>
++    apiGet<TaskActualRow[]>("getTaskActualsSheet")
++  );
+ }
+ 
+ export async function fetchAdminDashboardData(): Promise<AdminDashboardData> {
+-  console.log("[API] fetchAdminDashboardData");
+-  return apiGet<AdminDashboardData>("getAdminDashboardData");
++  return cachedApiGet("adminDashboard", () =>
++    apiGet<AdminDashboardData>("getAdminDashboardData")
++  );
+ }
+ 
+ export async function fetchLeaderboard(): Promise<LeaderboardEntry[]> {
+-  console.log("[API] fetchLeaderboard");
+-  try {
+-    const data = await apiGet<LeaderboardEntry[]>("getLeaderboard");
+-    if (data && data.length > 0) return data;
+-    throw new Error("Empty leaderboard");
+-  } catch {
+-    console.log("[API] Leaderboard endpoint not available, building from collectors");
+-    return [];
+-  }
++  return cachedApiGet("leaderboard", async () => {
++    try {
++      const data = await apiGet<LeaderboardEntry[]>("getLeaderboard");
++      if (data && data.length > 0) return data;
++      throw new Error("Empty leaderboard");
++    } catch {
++      console.log("[API] Leaderboard endpoint not available, building from collectors");
++      return [];
++    }
++  });
+ }
+ 
+ export async function buildLeaderboardFromCollectors(collectors: { name: string; rigs: string[] }[]): Promise<LeaderboardEntry[]> {
+   console.log("[API] buildLeaderboardFromCollectors for", collectors.length, "collectors");
+-  const SF_NAMES = new Set(["tony a", "veronika t", "travis b"]);
+   const results: LeaderboardEntry[] = [];
+ 
+   const statsPromises = collectors.map(async (c) => {
+@@ -278,7 +366,6 @@ export async function buildLeaderboardFromCollectors(collectors: { name: string;
+       const stats = await fetchCollectorStats(c.name);
+       return { collector: c, stats };
+     } catch {
+-      console.log("[API] Failed to fetch stats for", c.name);
+       return null;
+     }
+   });
+@@ -288,9 +375,6 @@ export async function buildLeaderboardFromCollectors(collectors: { name: string;
+   for (const result of settled) {
+     if (!result || !result.stats) continue;
+     const { collector, stats } = result;
+-    const hasSFRig = collector.rigs.some((r) => r.toUpperCase().includes("SF"));
+-    const isSFByName = SF_NAMES.has(collector.name.toLowerCase().replace(/\.$/, "").trim());
+-    const region = hasSFRig || isSFByName ? "SF" : "MX";
+ 
+     results.push({
+       rank: 0,
+@@ -299,21 +383,28 @@ export async function buildLeaderboardFromCollectors(collectors: { name: string;
+       tasksCompleted: stats.weeklyCompleted > 0 ? stats.weeklyCompleted : stats.totalCompleted,
+       tasksAssigned: stats.totalAssigned,
+       completionRate: stats.completionRate,
+-      region,
++      region: "",
+     });
+   }
+ 
+   results.sort((a, b) => b.hoursLogged - a.hoursLogged);
+-  results.forEach((e, i) => {
+-    e.rank = i + 1;
+-  });
+-
+-  console.log("[API] Built leaderboard with", results.length, "entries");
++  results.forEach((e, i) => { e.rank = i + 1; });
+   return results;
+ }
+ 
++export async function fetchAdminCollectors(): Promise<AdminCollectorDetail[]> {
++  return cachedApiGet("adminCollectors", () =>
++    apiGet<AdminCollectorDetail[]>("getAdminCollectors")
++  );
++}
++
++export async function fetchTaskRequirements(): Promise<TaskRequirement[]> {
++  return cachedApiGet("taskRequirements", () =>
++    apiGet<TaskRequirement[]>("getTaskRequirements")
++  );
++}
++
+ export function isApiConfigured(): boolean {
+   const url = getScriptUrl();
+-  console.log("[API] isApiConfigured check:", !!url, url ? url.slice(0, 40) : "EMPTY");
+   return !!url;
+ }
+diff --git a/types/index.ts b/types/index.ts
+index 01f4352..ec7f7be 100644
+--- a/types/index.ts
++++ b/types/index.ts
+@@ -121,3 +121,19 @@ export interface LeaderboardEntry {
+   completionRate: number;
+   region: string;
+ }
++
++export interface AdminCollectorDetail {
++  name: string;
++  rigs: string[];
++  email: string;
++  totalHours: number;
++  rating: string;
++}
++
++export interface TaskRequirement {
++  taskName: string;
++  requiredHours: number;
++  collectedHours: number;
++  remainingHours: number;
++  status: string;
++}
