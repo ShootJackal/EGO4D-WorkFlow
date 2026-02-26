@@ -121,3 +121,19 @@ export interface LeaderboardEntry {
   completionRate: number;
   region: string;
 }
+
+export interface AdminCollectorDetail {
+  name: string;
+  rigs: string[];
+  email: string;
+  totalHours: number;
+  rating: string;
+}
+
+export interface TaskRequirement {
+  taskName: string;
+  requiredHours: number;
+  collectedHours: number;
+  remainingHours: number;
+  status: string;
+}
